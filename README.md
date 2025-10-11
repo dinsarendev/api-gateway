@@ -256,7 +256,7 @@ INSERT INTO api_route (group_code, application_id, description, is_public, "meth
 ### 1️⃣ Clone the repository
 
 ```aidl
-  git clone git@github.com:personal-banking-transformation/api-gateway.git
+  git clone git@github.com:Cambofreelance-Software-Development/api-gateway.git
   cd api-gateway
 ```
 ### 2️⃣ Build & Run
