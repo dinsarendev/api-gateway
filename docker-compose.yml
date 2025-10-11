@@ -1,0 +1,12 @@
+version: '3'
+services:
+  api-gateway:
+    container_name: api-gateway
+    build: .
+    ports:
+      - "25010:25010"
+    networks:
+      - cf-network
+networks:
+  cf-network:
+    external: true
