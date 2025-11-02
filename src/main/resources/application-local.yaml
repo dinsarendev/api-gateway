@@ -5,7 +5,7 @@ spring:
   application:
     name: api-gateway
   r2dbc:
-    url: jdbc:postgresql://62.146.239.183:5511/dev_api_gateway
+    url: r2dbc:postgresql://62.146.239.183:5511/dev_api_gateway
     username: keycloak
     password: keycloak
 #    url: r2dbc:postgresql://localhost:12009/dev_api_gateway
