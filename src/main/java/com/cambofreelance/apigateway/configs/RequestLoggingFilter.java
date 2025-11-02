@@ -70,13 +70,10 @@ public class RequestLoggingFilter implements GlobalFilter {
             return errorResponse(exchange, HttpStatus.NOT_FOUND, ErrorCode.ERR_00404, "API route not found in cache");
         }
 
-        String deviceId = request.getHeaders().getFirst(Constants.DEVICE_ID);
-        String userId = request.getHeaders().getFirst(Constants.CLIENT_USER_ID);
-
         if (Constants.YES.equalsIgnoreCase(apiRouteDto.getIsPublic())
                 && method.equalsIgnoreCase(apiRouteDto.getMethod())) {
             return redisRouteFound
-                    ? applyRateLimitOrContinue(exchange, chain, path, method, userId, userId, clientIp)
+                    ? applyRateLimitOrContinue(exchange, chain, path, method, clientIp)
                     : chain.filter(exchange);
         }
 
@@ -96,7 +93,7 @@ public class RequestLoggingFilter implements GlobalFilter {
         ServerWebExchange mutatedExchange = exchange.mutate().request(mutatedRequest).build();
 
         return redisRouteFound
-                ? applyRateLimitOrContinue(mutatedExchange, chain, path, method, userId, deviceId, clientIp)
+                ? applyRateLimitOrContinue(mutatedExchange, chain, path, method, clientIp)
                 : chain.filter(mutatedExchange);
     }
 
@@ -112,8 +109,8 @@ public class RequestLoggingFilter implements GlobalFilter {
     }
 
     private Mono<Void> applyRateLimitOrContinue(ServerWebExchange exchange, GatewayFilterChain chain,
-                                                String path, String method, String userId, String deviceId, String clientIp) {
-        return rateLimiterService.isAllowed(path, method, userId, deviceId, clientIp)
+                                                String path, String method, String clientIp) {
+        return rateLimiterService.isAllowed(path, method, clientIp)
                 .flatMap(isAllowed -> {
                     if (Boolean.FALSE.equals(isAllowed)) {
                         return errorResponse(exchange, HttpStatus.TOO_MANY_REQUESTS, ErrorCode.ERR_00429,
