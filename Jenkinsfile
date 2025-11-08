@@ -213,7 +213,7 @@ pipeline {
         DOCKER_FULL_IMAGE = "${env.DOCKER_REPO_PATH}/api-gateway:${env.BUILD_NUMBER}"
 
         // Kubernetes Manifests
-        MANIFESTS_REPO_URL = 'https://github.com/Cambofreelance-Software-Development/api-gateway.git'
+        MANIFESTS_REPO_URL = 'https://github.com/Cambofreelance-Software-Development/api-gateway-manifest.git'
         MANIFESTS_DIR = 'k8s-manifests'
         MANIFESTS_BRANCH = 'main'
         MANIFESTS_PATH = "overlays/prod"
@@ -224,7 +224,7 @@ pipeline {
 
         // GitHub Credentials
         GITHUB_CREDENTIALS_ID = 'GitHub-Credentials'
-        GITHUB_REPO_URL = 'https://github.com/Cambofreelance-Software-Development/api-gateway-manifest.git'
+        GITHUB_REPO_URL = 'https://github.com/Cambofreelance-Software-Development/api-gateway.git'
 
         // Pipeline Config
         TARGET_BRANCH = 'main'
