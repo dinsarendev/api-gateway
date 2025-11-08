@@ -40,7 +40,7 @@ def buildAndPushImage(String imagePath, String buildContext = '.') {
             sh "pwd && ls -la"
 
             echo "🐳 Building image ${imagePath}"
-            def buildResult = sh(script: "docker build --pull -t ${imagePath} .", returnStatus: true)
+            def buildResult = sh(script: "docker build -t ${imagePath} .", returnStatus: true)
             if (buildResult != 0) {
                 error("Docker build failed")
             }
@@ -56,7 +56,7 @@ def buildAndPushImage(String imagePath, String buildContext = '.') {
         sh "pwd && ls -la"
 
         echo "🐳 Building image ${imagePath}"
-        def buildResult = sh(script: "docker build --pull -t ${imagePath} .", returnStatus: true)
+        def buildResult = sh(script: "docker build -t ${imagePath} .", returnStatus: true)
         if (buildResult != 0) {
             error("Docker build failed")
         }
