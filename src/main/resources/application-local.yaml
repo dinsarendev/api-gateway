@@ -11,11 +11,14 @@ spring:
 
   data:
     redis:
-      host: localhost
+      host: 62.146.239.183
       port: 6379
       timeout: 30000
+      user: default
+      password: CF@2025
       ssl:
         enabled: false
+
   security:
     oauth2:
       resourceserver:
