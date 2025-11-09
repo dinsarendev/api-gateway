@@ -2,7 +2,7 @@ version: '3'
 services:
   api-gateway:
     container_name: api-gateway
-    build: .
+    image: cambo-registry.cambofreelance.com/keycloak/api-gateway:1
     ports:
       - "25010:25010"
     networks:

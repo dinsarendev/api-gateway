@@ -165,6 +165,7 @@ def deployToServer(String serverIp, String containerName, String imagePath, Stri
                     -p ${appPort} \
                     --name ${containerName} \
                     --restart=unless-stopped \
+                    --network=cf-network \
                     ${imagePath}
             '
 
