@@ -5,17 +5,17 @@ spring:
   application:
     name: api-gateway
   r2dbc:
-    url: r2dbc:postgresql://62.146.239.183:5511/dev_api_gateway
-    username: keycloak
-    password: keycloak
+    url: r2dbc:postgresql://194.233.91.140:2017/api_gateway_db
+    username: postgres
+    password: CAMBO@@2026
 
   data:
     redis:
-      host: 62.146.239.183
-      port: 6379
+      host: 194.233.91.140
+      port: 16379
       timeout: 30000
       user: default
-      password: CF@2025
+#      password: CF@2025
       ssl:
         enabled: false
 
@@ -23,15 +23,15 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: https://keycloaks.cambofreelance.com:8443/realms/PBT-LOS
+          issuer-uri: https://key-aim.cambofreelance.com/realms/cambofreelance.dev
 
 keycloak:
-  url: https://keycloaks.cambofreelance.com:8443
-  realm: PBT-LOS
-  audience-client-id: los
-  audience-client-secret: RGAfrkUc6z2zKoH0LOlO09kx8AelgTec
-  username: admin
-  password: admin
+  url: https://key-aim.cambofreelance.com
+  realm: cambofreelance.dev
+  audience-client-id: KPS_GAME
+  audience-client-secret: yCygkPDxcPp3qtH0lGtBHvFhXKYBxTm1
+  admin-cli-client-id: authentication-client
+  admin-cli-client-secret: wJzYfm093CKXwCmzScq1Qm6IAVNCcoLz
   enable: Y
 
 logging:

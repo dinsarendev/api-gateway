@@ -23,7 +23,7 @@ RUN gradle wrapper
 # Make the wrapper executable and build the application
 RUN chmod +x ./gradlew && ./gradlew bootJar --no-daemon
 
-FROM amazoncorretto:21-alpine
+FROM eclipse-temurin:21-jdk-alpine
 
 # Set timezone via JVM (no /etc/timezone or shell available)
 ENV TZ=Asia/Phnom_Penh
