@@ -32,7 +32,8 @@ pipeline {
 
                 script {
                     // ✅ Call function after checkout
-                    def sha = getGitCommitSHA()
+                    //def sha = getGitCommitSHA()
+                    def sha = env.GIT_COMMIT
                     env.GIT_COMMIT_SHA    = sha
                     env.GIT_COMMIT_SHORT  = sha.take(7)
                     env.DOCKER_FULL_IMAGE = "${env.DOCKER_REPO_PATH}:${sha}"
