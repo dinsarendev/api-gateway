@@ -18,6 +18,9 @@ pipeline {
         FOLDER_REGISTRY = "ms/dev"
         IMAGE_NAME = "api-gateway-service"
         DOCKER_REPO_PATH = "${IMAGE_REGISTRY}/${FOLDER_REGISTRY}/${IMAGE_NAME}"
+
+        TELEGRAM_CHAT_ID  = '-1003570206702'
+        TELEGRAM_TOPIC_ID = '2'
     }
     stages {
         stage('Checkout Code') {
@@ -119,7 +122,7 @@ pipeline {
                 script {
                     sh '''
                         echo "🧹 Cleaning Docker Image"
-                        docker rmi ${FULL_IMAGE_NAME}
+                        docker rmi ${DOCKER_FULL_IMAGE}
                     '''
                 }
             }
