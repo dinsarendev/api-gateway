@@ -38,7 +38,6 @@ pipeline {
                     env.DOCKER_FULL_IMAGE = "${env.DOCKER_REPO_PATH}:${sha}"
 
                     echo "📋 Branch     : ${env.GIT_BRANCH}"
-                    echo "📋 Message    : ${env.GIT_COMMIT_MESSAGE}"
                     echo "📋 Full SHA   : ${env.GIT_COMMIT_SHA}"
                     echo "📋 Short SHA  : ${env.GIT_COMMIT_SHORT}"
                     echo "📋 Docker Tag : ${env.DOCKER_FULL_IMAGE}"
