@@ -154,13 +154,13 @@ def sendTelegramNotification(String status) {
     def emoji    = status == 'SUCCESS' ? '✅' : '❌'
     def buildUrl = env.BUILD_URL
     def buildNo  = env.BUILD_NUMBER
-    env.GIT_COMMIT_MESSAGE = sh(script: 'git log -1 --pretty=%B', returnStdout: true).trim()
+    def commit_message = sh(script: 'git log -1 --pretty=%B', returnStdout: true).trim()
 
     def message = """
 ${emoji} <b>${status}: ${env.PROJECT_SERVICE}</b>
 
 🌿 <b>Branch:</b>  <code>${env.GIT_BRANCH}</code>
-🔖 <b>Commit:</b>  <code>${env.GIT_COMMIT_MESSAGE}</code>
+🔖 <b>Commit:</b>  <code>${commit_message}</code>
 🐳 <b>Image:</b>   <code>${env.DOCKER_FULL_IMAGE}</code>
 🔢 <b>Build:</b>   #${buildNo}
 🔗 <a href="${buildUrl}">View Pipeline</a>
