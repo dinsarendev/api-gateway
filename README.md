@@ -296,5 +296,7 @@ INSERT INTO api_route (group_code, application_id, description, is_public, "meth
   runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.11.5' // or jjwt-gson if you prefer
   implementation("org.mindrot:jbcrypt:0.4")
 ```
+
+### DEVOPS
 ### 📜 License MIT License
 Cambofreelance.com is licensed
