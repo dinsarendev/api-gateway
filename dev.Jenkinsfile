@@ -154,6 +154,7 @@ def sendTelegramNotification(String status) {
     def emoji    = status == 'SUCCESS' ? '✅' : '❌'
     def buildUrl = env.BUILD_URL
     def buildNo  = env.BUILD_NUMBER
+    env.GIT_COMMIT_MESSAGE = sh(script: 'git log -1 --pretty=%B', returnStdout: true).trim()
 
     def message = """
 ${emoji} <b>${status}: ${env.PROJECT_SERVICE}</b>
