@@ -62,12 +62,12 @@ pipeline {
                         fi
 
                         echo ""
-                        echo "Building Docker image: ${FULL_IMAGE_NAME}"
-                        docker build -t ${FULL_IMAGE_NAME} .
+                        echo "Building Docker image: ${DOCKER_FULL_IMAGE}"
+                        docker build -t ${DOCKER_FULL_IMAGE} .
 
                         echo ""
                         echo "✅ Docker images created:"
-                        docker images | grep ${IMAGE_NAME}
+                        docker images | grep ${DOCKER_FULL_IMAGE}
                     '''
                 }
             }
@@ -77,7 +77,7 @@ pipeline {
                 script {
                     sh '''
                         echo "✅ Push Docker Image"
-                        docker push ${FULL_IMAGE_NAME}
+                        docker push ${DOCKER_FULL_IMAGE}
                     '''
                 }
             }
@@ -99,7 +99,7 @@ pipeline {
                         sh """
                             cd ${MANIFEST_FOLDER}
 
-                            sed -E -i 's|^([[:space:]]*image:[[:space:]]*).*\$|\\1${FULL_IMAGE_NAME}|' "${SERVICE_PATCH}"
+                            sed -E -i 's|^([[:space:]]*image:[[:space:]]*).*\$|\\1${DOCKER_FULL_IMAGE}|' "${SERVICE_PATCH}"
 
                             echo "Updated manifest:"
                             cat "${SERVICE_PATCH}"
@@ -107,7 +107,7 @@ pipeline {
                             git config user.email "jenkins@ci.local"
                             git config user.name "Jenkins"
                             git add "${SERVICE_PATCH}"
-                            git commit -m "Update ${SERVICE_PATCH} to ${FULL_IMAGE_NAME}"
+                            git commit -m "Update ${SERVICE_PATCH} to ${DOCKER_FULL_IMAGE}"
                             git push https://${GIT_USERNAME}:${GIT_PASSWORD}@${GIT_REPO_MANIFEST_UPDATE_URL} HEAD:${GIT_MANIFEST_BRANCH}
                         """
                     }
