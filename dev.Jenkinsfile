@@ -36,7 +36,7 @@ pipeline {
                     env.GIT_COMMIT_SHA    = sha
                     env.GIT_COMMIT_SHORT  = sha.take(7)
                     env.DOCKER_FULL_IMAGE = "${env.DOCKER_REPO_PATH}:${sha}"
-                    env.GIT_COMMIT_MESSAGE = sh(script: 'git log -1 --pretty=%s', returnStdout: true).trim()
+                    env.GIT_COMMIT_MESSAGE = ${commitMsg}
 
                     echo "📋 Branch     : ${env.GIT_BRANCH}"
                     echo "📋 Message    : ${env.GIT_COMMIT_MESSAGE}"
