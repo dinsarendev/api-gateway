@@ -37,7 +37,6 @@ pipeline {
                     env.GIT_COMMIT_SHORT  = sha.take(7)
                     env.DOCKER_FULL_IMAGE = "${env.DOCKER_REPO_PATH}:${sha}"
 
-
                     echo "📋 Branch     : ${env.GIT_BRANCH}"
                     echo "📋 Message    : ${env.GIT_COMMIT_MESSAGE}"
                     echo "📋 Full SHA   : ${env.GIT_COMMIT_SHA}"
@@ -161,7 +160,6 @@ ${emoji} <b>${status}: ${env.PROJECT_SERVICE}</b>
 
 🌿 <b>Branch:</b>  <code>${env.GIT_BRANCH}</code>
 🔖 <b>Commit:</b>  <code>${env.GIT_COMMIT_SHORT}</code>
-💬 <b>Message:</b> ${env.GIT_COMMIT_MESSAGE}
 🐳 <b>Image:</b>   <code>${env.DOCKER_FULL_IMAGE}</code>
 🔢 <b>Build:</b>   #${buildNo}
 🔗 <a href="${buildUrl}">View Pipeline</a>
