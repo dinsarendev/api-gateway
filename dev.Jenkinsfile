@@ -36,11 +36,14 @@ pipeline {
                     env.GIT_COMMIT_SHA    = sha
                     env.GIT_COMMIT_SHORT  = sha.take(7)
                     env.DOCKER_FULL_IMAGE = "${env.DOCKER_REPO_PATH}:${sha}"
+                    env.GIT_COMMIT_MESSAGE = sh(script: 'git log -1 --pretty=%s', returnStdout: true).trim()
 
                     echo "📋 Branch     : ${env.GIT_BRANCH}"
+                    echo "📋 Message    : ${env.GIT_COMMIT_MESSAGE}"
                     echo "📋 Full SHA   : ${env.GIT_COMMIT_SHA}"
                     echo "📋 Short SHA  : ${env.GIT_COMMIT_SHORT}"
                     echo "📋 Docker Tag : ${env.DOCKER_FULL_IMAGE}"
+
                 }
             }
         }
@@ -131,12 +134,12 @@ pipeline {
     post {
         success {
             script {
-                sendTelegramNotification("✅ SUCCESS: CI ${PROJECT_SERVICE}")
+                sendTelegramNotification('SUCCESS')
             }
         }
         failure {
             script {
-                sendTelegramNotification("❌ FAILED: CI ${PROJECT_SERVICE}")
+                sendTelegramNotification('FAILED')
             }
         }
         always {
@@ -148,27 +151,31 @@ pipeline {
     }
 }
 // HELPER FUNCTION
-def getGitCommitSHA(boolean shortSha = false) {
-    def cmd = shortSha ? 'git rev-parse --short HEAD' : 'git rev-parse HEAD'
-    def sha  = sh(script: cmd, returnStdout: true).trim()
+def sendTelegramNotification(String status) {
+    def emoji    = status == 'SUCCESS' ? '✅' : '❌'
+    def buildUrl = env.BUILD_URL
+    def buildNo  = env.BUILD_NUMBER
 
-    if (!sha) {
-        error("❌ Failed to retrieve Git commit SHA")
-    }
+    def message = """
+${emoji} <b>${status}: ${env.PROJECT_SERVICE}</b>
 
-    return sha
-}
+🌿 <b>Branch:</b>  <code>${env.GIT_BRANCH}</code>
+🔖 <b>Commit:</b>  <code>${env.GIT_COMMIT_SHORT}</code>
+💬 <b>Message:</b> ${env.GIT_COMMIT_MESSAGE}
+🐳 <b>Image:</b>   <code>${env.DOCKER_FULL_IMAGE}</code>
+🔢 <b>Build:</b>   #${buildNo}
+🔗 <a href="${buildUrl}">View Pipeline</a>
+""".trim()
 
-def sendTelegramNotification(String message) {
     withCredentials([
-        string(credentialsId: 'telegram_bot_token', variable: 'BOT_TOKEN')  // only token is secret
+        string(credentialsId: 'telegram_bot_token', variable: 'BOT_TOKEN')
     ]) {
         sh """
-            curl -s -X POST https://api.telegram.org/bot\${BOT_TOKEN}/sendMessage \
-            -d chat_id=${TELEGRAM_CHAT_ID} \
-            -d message_thread_id=${TELEGRAM_TOPIC_ID} \
-            -d parse_mode=HTML \
-            -d text='${message}'
+            curl -s -X POST https://api.telegram.org/bot\${BOT_TOKEN}/sendMessage \\
+            -d chat_id=${env.TELEGRAM_CHAT_ID} \\
+            -d message_thread_id=${env.TELEGRAM_TOPIC_ID} \\
+            -d parse_mode=HTML \\
+            --data-urlencode text='${message}'
         """
     }
 }
