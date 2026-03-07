@@ -164,8 +164,6 @@ ${emoji} <b>${status}: ${env.PROJECT_SERVICE}</b>
 🌿 <b>Branch:</b>  <code>${env.GIT_BRANCH}</code>
 🔖 <b>Commit:</b>  <code>${env.GIT_COMMIT_MESSAGE}</code>
 🐳 <b>Image:</b>   <code>${env.DOCKER_FULL_IMAGE}</code>
-🔢 <b>Build:</b>   #${buildNo}
-🔗 <a href="${buildUrl}">View Pipeline</a>
 """.trim()
 
     withCredentials([
