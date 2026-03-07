@@ -159,7 +159,7 @@ def sendTelegramNotification(String status) {
 
 
     def message = """
-${emoji} <b>${status}: ${env.PROJECT_SERVICE}</b>
+${emoji} <b>Building: ${env.PROJECT_SERVICE}</b>
 
 🌿 <b>Branch:</b>  <code>${env.GIT_BRANCH}</code>
 🔖 <b>Commit:</b>  <code>${env.GIT_COMMIT_MESSAGE}</code>
