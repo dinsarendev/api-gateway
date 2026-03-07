@@ -11,7 +11,7 @@ pipeline {
         GIT_REPO_MANIFEST_URL = "https://github.com/Cambofreelance-Software-Development/micro-manifest.git"
         GIT_REPO_MANIFEST_UPDATE_URL = "github.com/Cambofreelance-Software-Development/micro-manifest.git"
         GIT_MANIFEST_BRANCH = "dev"
-        MANIFEST_FOLDER = "dev/overlays/patches/gateway"
+        MANIFEST_FOLDER = "dev/overlays/gateway/patches"
         SERVICE_PATCH = "api-gateway-service-patch.yaml"
 
         IMAGE_REGISTRY = "nexus.cambofreelance.com/docker-hosted"
