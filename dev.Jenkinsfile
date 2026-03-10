@@ -1,6 +1,10 @@
 pipeline {
     agent any
 
+    tools {
+        maven 'maven'
+    }
+
     environment {
         PROJECT_SERVICE  = "API GATEWAY SERVICE 🗃️"
         GIT_BRANCH = "develop"
@@ -21,6 +25,11 @@ pipeline {
 
         TELEGRAM_CHAT_ID  = '-1003570206702'
         TELEGRAM_TOPIC_ID = '2'
+
+        // SonarQube
+        SONARQUBE_PROJECT_APP = "API GATEWAY"
+        SONARQUBE_PROJECT_KEY = "API-GATEWAY"
+        SONARQUBE_PROJECT_URL = "https://sonar-qube.cambofreelance.com"
     }
     stages {
         stage('Checkout Code') {
@@ -45,6 +54,42 @@ pipeline {
                     echo "📋 Short SHA  : ${env.GIT_COMMIT_SHORT}"
                     echo "📋 Docker Tag : ${env.DOCKER_FULL_IMAGE}"
 
+                }
+            }
+        }
+
+        // ✅ set mvnw permission
+        stage('Set Maven Wrapper Permission') {
+            steps {
+                sh '''
+                    echo "🔧 Fixing mvnw permission..."
+
+                    if [ -f mvnw ]; then
+                        chmod +x mvnw
+                        echo "✅ mvnw is now executable"
+                        ls -la mvnw
+                    else
+                        echo "⚠️ mvnw not found, skipping chmod"
+                    fi
+                '''
+            }
+        }
+
+        stage('Build') {
+            steps {
+                sh './mvnw clean package -DskipTests'
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('SonarQube-Server') {
+                    sh '''
+                        ./mvnw sonar:sonar \
+                          -Dsonar.projectKey="${env.SONARQUBE_PROJECT_KEY}" \
+                          -Dsonar.projectName="${env.SONARQUBE_PROJECT_APP}" \
+                          -Dsonar.host.url="${SONARQUBE_PROJECT_URL}"
+                    '''
                 }
             }
         }
@@ -156,7 +201,7 @@ def sendTelegramNotification(String status) {
     def emoji    = status == 'SUCCESS' ? '✅' : '❌'
     def buildUrl = env.BUILD_URL
     def buildNo  = env.BUILD_NUMBER
-
+    def sonarLink = "https://sonar-qube.cambofreelance.com/dashboard?id=${SONARQUBE_PROJECT_KEY}"
 
     def message = """
 ${emoji} <b>Building: ${env.PROJECT_SERVICE}</b>
@@ -164,6 +209,7 @@ ${emoji} <b>Building: ${env.PROJECT_SERVICE}</b>
 🌿 <b>Branch:</b>  <code>${env.GIT_BRANCH}</code>
 🔖 <b>Commit:</b>  <code>${env.GIT_COMMIT_MESSAGE}</code>
 🐳 <b>Image:</b>   <code>${env.DOCKER_FULL_IMAGE}</code>
+🚓 <b>SonarQube:</b>   <code>${sonarLink}</code>
 """.trim()
 
     withCredentials([
