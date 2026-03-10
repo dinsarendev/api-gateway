@@ -1,6 +1,10 @@
 pipeline {
     agent any
 
+    tools {
+        gradle 'gradle'
+    }
+
     environment {
         PROJECT_SERVICE  = "API GATEWAY SERVICE 🗃️"
         GIT_BRANCH = "develop"
@@ -51,6 +55,12 @@ pipeline {
                     echo "📋 Docker Tag : ${env.DOCKER_FULL_IMAGE}"
 
                 }
+            }
+        }
+
+        stage('Build') {
+            steps {
+                sh './gradlew clean build'
             }
         }
 
