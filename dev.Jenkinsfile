@@ -54,11 +54,11 @@ pipeline {
             }
         }
 
-         stage('SonarQube Analysis') {
+        stage('SonarQube Analysis') {
             withSonarQubeEnv() {
                 sh "./gradlew sonar"
             }
-         }
+        }
 
         stage('Docker Build Image') {
             steps {
