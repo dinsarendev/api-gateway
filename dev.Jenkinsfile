@@ -55,8 +55,13 @@ pipeline {
         }
 
         stage('SonarQube Analysis') {
-            withSonarQubeEnv() {
-                sh "./gradlew sonar"
+            steps {
+                withSonarQubeEnv('SonarQube-Server') {
+                    sh "./gradlew sonar \
+                        -Dsonar.projectKey=${SONARQUBE_PROJECT_KEY} \
+                        -Dsonar.projectName='${SONARQUBE_PROJECT_APP}' \
+                        -Dsonar.host.url=${SONARQUBE_PROJECT_URL}"
+                }
             }
         }
 
