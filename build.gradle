@@ -2,6 +2,7 @@ plugins {
     id 'java'
     id 'org.springframework.boot' version '3.4.5'
     id 'io.spring.dependency-management' version '1.1.7'
+    id "org.sonarqube" version "7.1.0.6387"
 }
 
 group = 'com.cambofreelance'
@@ -32,6 +33,13 @@ repositories {
 
 ext {
     set('springCloudVersion', "2024.0.1")
+}
+
+sonar {
+    properties {
+        property "sonar.projectKey", "API-GATEWAY"
+        property "sonar.projectName", "API GATEWAY"
+    }
 }
 
 dependencies {

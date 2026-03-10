@@ -1,10 +1,6 @@
 pipeline {
     agent any
 
-    tools {
-        maven 'maven'
-    }
-
     environment {
         PROJECT_SERVICE  = "API GATEWAY SERVICE 🗃️"
         GIT_BRANCH = "develop"
@@ -58,41 +54,11 @@ pipeline {
             }
         }
 
-        // ✅ set mvnw permission
-        stage('Set Maven Wrapper Permission') {
-            steps {
-                sh '''
-                    echo "🔧 Fixing mvnw permission..."
-
-                    if [ -f mvnw ]; then
-                        chmod +x mvnw
-                        echo "✅ mvnw is now executable"
-                        ls -la mvnw
-                    else
-                        echo "⚠️ mvnw not found, skipping chmod"
-                    fi
-                '''
+         stage('SonarQube Analysis') {
+            withSonarQubeEnv() {
+                sh "./gradlew sonar"
             }
-        }
-
-        stage('Build') {
-            steps {
-                sh './mvnw clean package -DskipTests'
-            }
-        }
-
-        stage('SonarQube Analysis') {
-            steps {
-                withSonarQubeEnv('SonarQube-Server') {
-                    sh '''
-                        ./mvnw sonar:sonar \
-                          -Dsonar.projectKey="${env.SONARQUBE_PROJECT_KEY}" \
-                          -Dsonar.projectName="${env.SONARQUBE_PROJECT_APP}" \
-                          -Dsonar.host.url="${SONARQUBE_PROJECT_URL}"
-                    '''
-                }
-            }
-        }
+         }
 
         stage('Docker Build Image') {
             steps {
