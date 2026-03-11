@@ -55,7 +55,7 @@ logging:
 otel:
   exporter:
     otlp:
-      endpoint: http://alloy:4317
+      endpoint: http://alloy.monitoring.svc.cluster.local:4317
       protocol: grpc
   logs:
     exporter: none
