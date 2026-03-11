@@ -1,10 +1,6 @@
 pipeline {
     agent any
 
-    tools {
-        gradle 'gradle'
-    }
-
     environment {
         PROJECT_SERVICE  = "API GATEWAY SERVICE 🗃️"
         GIT_BRANCH = "develop"
@@ -25,11 +21,6 @@ pipeline {
 
         TELEGRAM_CHAT_ID  = '-1003570206702'
         TELEGRAM_TOPIC_ID = '2'
-
-        // SonarQube
-        SONARQUBE_PROJECT_APP = "API GATEWAY"
-        SONARQUBE_PROJECT_KEY = "API-GATEWAY"
-        SONARQUBE_PROJECT_URL = "https://sonar-qube.cambofreelance.com"
     }
     stages {
         stage('Checkout Code') {
@@ -54,23 +45,6 @@ pipeline {
                     echo "📋 Short SHA  : ${env.GIT_COMMIT_SHORT}"
                     echo "📋 Docker Tag : ${env.DOCKER_FULL_IMAGE}"
 
-                }
-            }
-        }
-
-        stage('Build') {
-            steps {
-                sh './gradlew clean build'
-            }
-        }
-
-        stage('SonarQube Analysis') {
-            steps {
-                withSonarQubeEnv('SonarQube-Server') {
-                    sh "./gradlew sonar \
-                        -Dsonar.projectKey=${SONARQUBE_PROJECT_KEY} \
-                        -Dsonar.projectName='${SONARQUBE_PROJECT_APP}' \
-                        -Dsonar.host.url=${SONARQUBE_PROJECT_URL}"
                 }
             }
         }
@@ -182,7 +156,6 @@ def sendTelegramNotification(String status) {
     def emoji    = status == 'SUCCESS' ? '✅' : '❌'
     def buildUrl = env.BUILD_URL
     def buildNo  = env.BUILD_NUMBER
-    def sonarLink = "https://sonar-qube.cambofreelance.com/dashboard?id=${SONARQUBE_PROJECT_KEY}"
 
     def message = """
 ${emoji} <b>Building: ${env.PROJECT_SERVICE}</b>
@@ -190,7 +163,6 @@ ${emoji} <b>Building: ${env.PROJECT_SERVICE}</b>
 🌿 <b>Branch:</b>  <code>${env.GIT_BRANCH}</code>
 🔖 <b>Commit:</b>  <code>${env.GIT_COMMIT_MESSAGE}</code>
 🐳 <b>Image:</b>   <code>${env.DOCKER_FULL_IMAGE}</code>
-🚓 <b>SonarQube:</b>   <code>${sonarLink}</code>
 """.trim()
 
     withCredentials([
