@@ -64,6 +64,8 @@ otel:
   traces:
     sampler:
       probability: 1.0
+  service:
+    name: api-gateway
 
 management:
   endpoints:
