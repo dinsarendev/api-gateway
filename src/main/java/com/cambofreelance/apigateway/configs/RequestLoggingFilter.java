@@ -127,7 +127,7 @@ public class RequestLoggingFilter implements GlobalFilter {
 
     private ApiRouteDto safeGetApiRouteFromRedis(String path, String method) {
         try {
-            return apiRouteManagerRedisCache.getPathAndMethod(path, method);
+            return apiRouteManagerRedisCache.get(path, method);
         } catch (Exception e) {
             log.error("Redis error fetching route [{} {}]: {}", path, method, e.getMessage(), e);
             return null;

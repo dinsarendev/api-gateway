@@ -97,7 +97,7 @@ public class RateLimiterService {
     public Mono<Boolean> isAllowed(String path, String method, String clientIp) {
 
         final String normalizedPath = normalizePath(path);
-        ApiRouteDto routeConfig = apiRouteManagerRedisCache.getPathAndMethod(normalizedPath,
+        ApiRouteDto routeConfig = apiRouteManagerRedisCache.get(normalizedPath,
             method);
 
         // No rate limit configured → allow request
