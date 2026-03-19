@@ -40,12 +40,11 @@ public class ApiRouteManagerCache {
         }
 
         // 2. Wildcard match (/**, *, etc.)
+        // IMPORTANT: most specific path first
         return apiRouteCache.values().stream()
             .filter(dto -> dto.getMethod().equalsIgnoreCase(method))
             .filter(dto -> matcher.match(dto.getPath(), path))
-            // IMPORTANT: most specific path first
-            .sorted((a, b) -> b.getPath().length() - a.getPath().length())
-            .findFirst()
+            .min((a, b) -> b.getPath().length() - a.getPath().length())
             .orElse(null);
     }
 
