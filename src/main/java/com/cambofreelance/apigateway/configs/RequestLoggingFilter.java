@@ -68,7 +68,7 @@ public class RequestLoggingFilter implements GlobalFilter {
         boolean redisRouteFound = apiRouteDto != null;
 
         if (Objects.isNull(apiRouteDto)) {
-            apiRouteDto = ApiRouteManagerCache.getByPath(path);
+            apiRouteDto = ApiRouteManagerCache.get(path, method);
         }
 
         if (Objects.isNull(apiRouteDto)) {

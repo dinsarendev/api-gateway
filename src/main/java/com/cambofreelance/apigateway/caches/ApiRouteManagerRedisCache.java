@@ -42,8 +42,12 @@ public class ApiRouteManagerRedisCache {
             redisTemplate.delete(KEY);
 
             for (ApiRouteDto route : routes) {
-                String redisKey = buildKey(route.getPath(), route.getMethod());
-                hashOperations.put(KEY, redisKey, route);
+                hashOperations.put(KEY, buildKey(route.getPath(), route.getMethod()), route);
+
+                // Track wildcard routes in a separate set for efficient lookup
+                if (route.getPath().endsWith("/**")) {
+                    hashOperations.put(KEY + ":wildcards", buildKey(route.getPath(), route.getMethod()), route);
+                }
             }
 
             log.info("API Route cache initialized: {} records", routes.size());
@@ -56,8 +60,12 @@ public class ApiRouteManagerRedisCache {
     // ================= ADD / UPDATE =================
     public void put(ApiRouteDto route) {
         try {
-            String redisKey = buildKey(route.getPath(), route.getMethod());
-            hashOperations.put(KEY, redisKey, route);
+            hashOperations.put(KEY, buildKey(route.getPath(), route.getMethod()), route);
+
+            if (route.getPath().endsWith("/**")) {
+                hashOperations.put(KEY + ":wildcards", buildKey(route.getPath(), route.getMethod()), route);
+            }
+
         } catch (Exception e) {
             log.error("Put cache error", e);
         }
@@ -67,6 +75,12 @@ public class ApiRouteManagerRedisCache {
         try {
             String redisKey = buildKey(route.getPath(), route.getMethod());
             hashOperations.delete(KEY, redisKey);
+
+            // Also remove from wildcard set if applicable
+            if (route.getPath().endsWith("/**")) {
+                hashOperations.delete(KEY + ":wildcards", redisKey);
+            }
+
         } catch (Exception e) {
             log.error("Evict cache error", e);
         }
@@ -75,21 +89,18 @@ public class ApiRouteManagerRedisCache {
     // ================= GET =================
     public ApiRouteDto get(String path, String method) {
         try {
-            // 1. Exact match (O(1))
-            String key = buildKey(path, method);
-            ApiRouteDto exact = (ApiRouteDto) hashOperations.get(KEY, key);
-
+            // 1. Exact match O(1)
+            ApiRouteDto exact = hashOperations.get(KEY, buildKey(path, method));
             if (exact != null) {
                 return exact;
             }
 
-            // 2. Wildcard match (fallback)
-            Map<String, ApiRouteDto> entries = hashOperations.entries(KEY);
+            // 2. Wildcard match — only scans the smaller wildcards hash, not full route table
+            Map<String, ApiRouteDto> wildcards = hashOperations.entries(KEY + ":wildcards");
 
-            return entries.values().stream()
+            return wildcards.values().stream()
                 .filter(dto -> dto.getMethod().equalsIgnoreCase(method))
-                .filter(dto -> dto.getPath().endsWith("/**"))
-                .filter(dto -> path.startsWith(dto.getPath().replace("/**", "")))
+                .filter(dto -> matchesWildcard(dto.getPath(), path))
                 .findFirst()
                 .orElse(null);
 
@@ -100,7 +111,29 @@ public class ApiRouteManagerRedisCache {
     }
 
     // ================= UTIL =================
+
+    /**
+     * Builds a composite Redis hash field key from path and HTTP method.
+     * Example: "/authentication/applications/**" + "GET" → "/authentication/applications/**:GET"
+     */
     private String buildKey(String path, String method) {
         return path + ":" + method.toUpperCase();
+    }
+
+    /**
+     * Matches a request path against a wildcard route pattern (/** suffix only).
+     * Requires a "/" boundary after the prefix to prevent false matches.
+     *
+     * Examples:
+     *   matchesWildcard("/api/users/**", "/api/users/123")     → true
+     *   matchesWildcard("/api/users/**", "/api/users")         → true  (exact prefix)
+     *   matchesWildcard("/api/users/**", "/api/usersfoo")      → false (no boundary)
+     */
+    private boolean matchesWildcard(String routePath, String requestPath) {
+        if (!routePath.endsWith("/**")) {
+            return false;
+        }
+        String prefix = routePath.replace("/**", "");
+        return requestPath.equals(prefix) || requestPath.startsWith(prefix + "/");
     }
 }

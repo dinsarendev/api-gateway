@@ -1,61 +1,76 @@
 package com.cambofreelance.apigateway.caches;
 
-import java.util.Hashtable;
-import java.util.List;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.cambofreelance.apigateway.dto.ApiRouteDto;
-import org.springframework.util.AntPathMatcher;
 
 public class ApiRouteManagerCache {
 
-    private static Hashtable<String, ApiRouteDto> apiRouteCache;
-    private static Hashtable<String, String> generalCaches;
+    // ================= CACHE =================
+    private static Map<String, ApiRouteDto> exactMap;
+    private static List<ApiRouteDto> wildcardList;
+    private static Map<String, String> generalCaches;
 
-    private static final AntPathMatcher matcher = new AntPathMatcher();
+    // ================= INIT =================
+    public static void init(List<ApiRouteDto> routes) {
 
-    public static void init(List<ApiRouteDto> apiRouteDtoList) {
-        generalCaches = new Hashtable<>();
-        apiRouteCache = new Hashtable<>();
+        exactMap = new ConcurrentHashMap<>();
+        wildcardList = new ArrayList<>();
+        generalCaches = new ConcurrentHashMap<>();
 
-        if (apiRouteDtoList != null && !apiRouteDtoList.isEmpty()) {
-            for (ApiRouteDto value : apiRouteDtoList) {
-                // key = path:method  (IMPORTANT)
-                String key = buildKey(value.getPath(), value.getMethod());
-                apiRouteCache.put(key, value);
+        if (routes == null || routes.isEmpty()) return;
+
+        for (ApiRouteDto route : routes) {
+
+            String path = normalize(route.getPath());
+            route.setPath(path);
+
+            String key = buildKey(path, route.getMethod());
+
+            if (isWildcard(path)) {
+
+                // precompute basePath
+                route.setPath(extractBasePath(path));
+
+                wildcardList.add(route);
+
+            } else {
+                exactMap.put(key, route);
             }
         }
+
+        // sort once (IMPORTANT)
+        wildcardList.sort((a, b) ->
+            b.getPath().length() - a.getPath().length()
+        );
     }
 
-    // ================= GET (NEW - SUPPORT METHOD + WILDCARD) =================
+    // ================= GET =================
     public static ApiRouteDto get(String path, String method) {
 
-        if (apiRouteCache == null) return null;
+        if (exactMap == null) return null;
 
-        // 1. Exact match (FAST)
-        String key = buildKey(path, method);
-        ApiRouteDto exact = apiRouteCache.get(key);
+        String normalizedPath = normalize(path);
+        String key = buildKey(normalizedPath, method);
 
+        // 1. Exact match (O(1))
+        ApiRouteDto exact = exactMap.get(key);
         if (exact != null) {
             return exact;
         }
 
-        // 2. Wildcard match (/**, *, etc.)
-        // IMPORTANT: most specific path first
-        return apiRouteCache.values().stream()
-            .filter(dto -> dto.getMethod().equalsIgnoreCase(method))
-            .filter(dto -> matcher.match(dto.getPath(), path))
-            .min((a, b) -> b.getPath().length() - a.getPath().length())
-            .orElse(null);
-    }
+        // 2. Wildcard match (FAST)
+        for (ApiRouteDto dto : wildcardList) {
 
-    // ================= LEGACY (KEEP IF NEEDED) =================
-    public static ApiRouteDto getByPath(String path) {
-        if (apiRouteCache == null) return null;
+            if (!dto.getMethod().equalsIgnoreCase(method)) continue;
 
-        return apiRouteCache.values().stream()
-            .filter(dto -> dto.getPath().equals(path))
-            .findFirst()
-            .orElse(null);
+            if (normalizedPath.startsWith(dto.getPath())) {
+                return dto;
+            }
+        }
+
+        return null;
     }
 
     // ================= GENERAL CACHE =================
@@ -68,7 +83,25 @@ public class ApiRouteManagerCache {
     }
 
     // ================= UTIL =================
+    private static boolean isWildcard(String path) {
+        return path.endsWith("/**");
+    }
+
+    private static String extractBasePath(String path) {
+        return path.substring(0, path.length() - 3);
+    }
+
     private static String buildKey(String path, String method) {
         return path + ":" + method.toUpperCase();
+    }
+
+    private static String normalize(String path) {
+        if (path == null || path.isEmpty()) return "/";
+
+        if (path.length() > 1 && path.endsWith("/")) {
+            return path.substring(0, path.length() - 1);
+        }
+
+        return path;
     }
 }
