@@ -1,27 +1,7 @@
 spring:
   config:
-    import: "optional:configserver:http://svc-msa-config-server:8081/"
+    import: "optional:configserver:http://localhost:8082/"
   application:
     name: api-gateway
   profiles:
-    active: local
-  cloud:
-    compatibility-verifier:
-      enabled: false
-    gateway:
-      globalcors:
-        add-to-simple-url-handler-mapping: true
-        cors-configurations:
-          '[/**]':
-            allowedOriginPatterns:
-              - "http://localhost:[*]"
-              - "https://*.cambofreelance.com"
-            allowedMethods:
-              - GET
-              - POST
-              - PUT
-              - DELETE
-              - OPTIONS
-            allowedHeaders:
-              - "*"
-            allowCredentials: true
+    active: dev
