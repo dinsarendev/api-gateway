@@ -1,21 +1,29 @@
 package com.cambofreelance.apigateway.controllers;
 
-import org.springframework.http.HttpStatus;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
-
-import java.net.URI;
 
 @RestController
 public class AdminIndexController {
 
-    /** Redirect bare root to the admin SPA. */
-    @GetMapping("/")
-    public Mono<Void> root(ServerWebExchange exchange) {
-        exchange.getResponse().setStatusCode(HttpStatus.FOUND);
-        exchange.getResponse().getHeaders().setLocation(URI.create("/index.html"));
-        return exchange.getResponse().setComplete();
+    private static final Resource INDEX = new ClassPathResource("static/index.html");
+
+    /**
+     * Serve index.html for every admin SPA route so BrowserRouter direct-URL
+     * access works. Paths are enumerated explicitly to avoid intercepting
+     * gateway proxy traffic.
+     */
+    @GetMapping(value = {
+        "/", "/dashboard",
+        "/routes", "/groups", "/registry", "/health",
+        "/security/api-keys", "/security/ip-acl", "/security/oauth2",
+        "/users", "/roles", "/profile",
+    }, produces = MediaType.TEXT_HTML_VALUE)
+    public Mono<Resource> spa() {
+        return Mono.just(INDEX);
     }
 }

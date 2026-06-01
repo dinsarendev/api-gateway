@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import { ToastProvider } from './context/ToastContext';
 import { AuthProvider } from './context/AuthContext';
@@ -78,13 +78,13 @@ export default function App() {
   const handleLogin = () => setLoggedIn(true);
 
   return (
-    <HashRouter>
+    <BrowserRouter>
       <ToastProvider>
         {loggedIn
           ? <AuthProvider><Layout /></AuthProvider>
           : <Login onLogin={handleLogin} />
         }
       </ToastProvider>
-    </HashRouter>
+    </BrowserRouter>
   );
 }
