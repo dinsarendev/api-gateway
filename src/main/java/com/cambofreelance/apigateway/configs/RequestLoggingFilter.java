@@ -50,11 +50,8 @@ public class RequestLoggingFilter implements GlobalFilter {
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         ServerHttpRequest request = exchange.getRequest();
-        String uri = request.getURI().toString();
-        String path = request.getPath().toString();
-        String method = Optional.of(request.getMethod())
-                .map(Object::toString)
-                .orElse(Constants.UNKNOWN);
+        String path   = request.getPath().toString();
+        String method = Optional.of(request.getMethod()).map(Object::toString).orElse(Constants.UNKNOWN);
 
         if (HttpMethod.OPTIONS.equals(request.getMethod())) {
             return chain.filter(exchange);
@@ -62,74 +59,66 @@ public class RequestLoggingFilter implements GlobalFilter {
 
         String clientIp = resolveClientIp(request);
 
-        log.info("Request received: uri={}, path={}, method={}, clientIp={}", uri, path, method, clientIp);
+        log.info("Request: uri={}, method={}, ip={}", request.getURI(), method, clientIp);
 
+        // Resolve route — Redis first, in-memory fallback
         ApiRouteDto apiRouteDto = safeGetApiRouteFromRedis(path, method);
-        boolean redisRouteFound = apiRouteDto != null;
-
-        if (Objects.isNull(apiRouteDto)) {
+        if (apiRouteDto == null) {
             apiRouteDto = ApiRouteManagerCache.get(path, method);
         }
 
-        if (Objects.isNull(apiRouteDto)) {
-            return errorResponse(exchange, HttpStatus.NOT_FOUND, ErrorCode.ERR_00404, "API route not found in cache");
+        if (apiRouteDto == null) {
+            return errorResponse(exchange, HttpStatus.NOT_FOUND, ErrorCode.ERR_00404, "API route not found");
         }
 
-        if (Constants.YES.equalsIgnoreCase(apiRouteDto.getIsPublic())
-                && method.equalsIgnoreCase(apiRouteDto.getMethod())) {
-            return redisRouteFound
-                    ? applyRateLimitOrContinue(exchange, chain, path, method, clientIp)
-                    : chain.filter(exchange);
+        // Public routes — skip auth header check
+        if (Constants.YES.equalsIgnoreCase(apiRouteDto.getIsPublic())) {
+            return applyRateLimitOrContinue(exchange, chain, method, clientIp, apiRouteDto);
         }
 
+        // Private routes — require Bearer token
         String authHeader = request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
         if (StringUtils.isBlank(authHeader)) {
             return errorResponse(exchange, HttpStatus.UNAUTHORIZED, ErrorCode.ERR_00401, "Missing Authorization header");
         }
-
         if (!authHeader.startsWith(Constants.BEARER)) {
             return errorResponse(exchange, HttpStatus.UNAUTHORIZED, ErrorCode.ERR_00401, "Invalid Authorization header format");
         }
 
-        ServerHttpRequest mutatedRequest = request.mutate()
-                .header(Constants.IP, clientIp)
-                .build();
+        ServerWebExchange mutatedExchange = exchange.mutate()
+            .request(request.mutate().header(Constants.IP, clientIp).build())
+            .build();
 
-        ServerWebExchange mutatedExchange = exchange.mutate().request(mutatedRequest).build();
-
-        return redisRouteFound
-                ? applyRateLimitOrContinue(mutatedExchange, chain, path, method, clientIp)
-                : chain.filter(mutatedExchange);
-    }
-
-    private String resolveClientIp(ServerHttpRequest request) {
-        HttpHeaders headers = request.getHeaders();
-        String forwardedFor = headers.getFirst(Constants.X_FORWARDED_FOR);
-        if (StringUtils.isNotBlank(forwardedFor)) {
-            return forwardedFor.split(",")[0].trim();
-        }
-        return Optional.ofNullable(request.getRemoteAddress())
-                .map(addr -> addr.getAddress().getHostAddress())
-                .orElse(Constants.UNKNOWN);
+        return applyRateLimitOrContinue(mutatedExchange, chain, method, clientIp, apiRouteDto);
     }
 
     private Mono<Void> applyRateLimitOrContinue(ServerWebExchange exchange, GatewayFilterChain chain,
-                                                String path, String method, String clientIp) {
-        return rateLimiterService.isAllowed(path, method, clientIp)
-                .flatMap(isAllowed -> {
-                    if (Boolean.FALSE.equals(isAllowed)) {
-                        return errorResponse(exchange, HttpStatus.TOO_MANY_REQUESTS, ErrorCode.ERR_00429,
-                                "Rate limit exceeded. Please try again later.");
-                    }
-                    return chain.filter(exchange);
-                });
+                                                String method, String clientIp, ApiRouteDto routeConfig) {
+        return rateLimiterService.isAllowed(method, clientIp, routeConfig)
+            .flatMap(allowed -> {
+                if (Boolean.FALSE.equals(allowed)) {
+                    return errorResponse(exchange, HttpStatus.TOO_MANY_REQUESTS, ErrorCode.ERR_00429,
+                        "Rate limit exceeded. Please try again later.");
+                }
+                return chain.filter(exchange);
+            });
+    }
+
+    private String resolveClientIp(ServerHttpRequest request) {
+        String forwarded = request.getHeaders().getFirst(Constants.X_FORWARDED_FOR);
+        if (StringUtils.isNotBlank(forwarded)) {
+            return forwarded.split(",")[0].trim();
+        }
+        return Optional.ofNullable(request.getRemoteAddress())
+            .map(addr -> addr.getAddress().getHostAddress())
+            .orElse(Constants.UNKNOWN);
     }
 
     private ApiRouteDto safeGetApiRouteFromRedis(String path, String method) {
         try {
             return apiRouteManagerRedisCache.get(path, method);
         } catch (Exception e) {
-            log.error("Redis error fetching route [{} {}]: {}", path, method, e.getMessage(), e);
+            log.warn("Redis route lookup failed [{} {}]: {}", method, path, e.getMessage());
             return null;
         }
     }
@@ -152,7 +141,7 @@ public class RequestLoggingFilter implements GlobalFilter {
             response.getHeaders().set(HttpHeaders.CONTENT_TYPE, "application/json");
             return response.writeWith(Mono.just(buffer));
         } catch (Exception e) {
-            log.error("Failed to serialize MessageResponse", e);
+            log.error("Failed to write error response", e);
             response.setStatusCode(HttpStatus.INTERNAL_SERVER_ERROR);
             return response.setComplete();
         }
@@ -160,7 +149,7 @@ public class RequestLoggingFilter implements GlobalFilter {
 
     private String getTraceId() {
         return tracer != null && tracer.currentSpan() != null
-                ? Objects.requireNonNull(tracer.currentSpan()).context().traceId()
-                : UUID.randomUUID().toString();
+            ? Objects.requireNonNull(tracer.currentSpan()).context().traceId()
+            : UUID.randomUUID().toString();
     }
 }
