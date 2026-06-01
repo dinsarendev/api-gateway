@@ -87,3 +87,25 @@ dependencyManagement {
 tasks.named('test') {
     useJUnitPlatform()
 }
+
+// ── Frontend (React + Vite) ─────────────────────────────────────────────────
+def frontendDir = "$projectDir/frontend"
+
+task npmInstall(type: Exec) {
+    description = 'Install frontend dependencies'
+    workingDir  frontendDir
+    inputs.file  "$frontendDir/package.json"
+    outputs.dir  "$frontendDir/node_modules"
+    commandLine  'sh', '-c', 'npm install --prefer-offline'
+}
+
+task npmBuild(type: Exec, dependsOn: npmInstall) {
+    description = 'Build React frontend into src/main/resources/static'
+    workingDir  frontendDir
+    inputs.dir  "$frontendDir/src"
+    inputs.file "$frontendDir/vite.config.js"
+    outputs.dir "$projectDir/src/main/resources/static"
+    commandLine 'sh', '-c', 'npm run build'
+}
+
+processResources.dependsOn npmBuild
