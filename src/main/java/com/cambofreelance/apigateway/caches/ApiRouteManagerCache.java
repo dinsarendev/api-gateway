@@ -9,6 +9,7 @@ public class ApiRouteManagerCache {
 
     // ================= CACHE =================
     private static Map<String, ApiRouteDto> exactMap;
+    private static List<ApiRouteDto> pathVariableList;
     private static List<ApiRouteDto> wildcardList;
     private static Map<String, String> generalCaches;
 
@@ -16,6 +17,7 @@ public class ApiRouteManagerCache {
     public static void init(List<ApiRouteDto> routes) {
 
         exactMap = new ConcurrentHashMap<>();
+        pathVariableList = new ArrayList<>();
         wildcardList = new ArrayList<>();
         generalCaches = new ConcurrentHashMap<>();
 
@@ -28,11 +30,13 @@ public class ApiRouteManagerCache {
 
             String key = buildKey(path, route.getMethod());
 
-            if (isWildcard(path)) {
+            if (hasPathVariable(path)) {
+                // path variable route: /users/{id}, /users/{id}/posts/{postId}, /users/{id}/**
+                pathVariableList.add(route);
 
-                // precompute basePath
+            } else if (isWildcard(path)) {
+                // pure wildcard route: /api/**, /users/**
                 route.setPath(extractBasePath(path));
-
                 wildcardList.add(route);
 
             } else {
@@ -40,7 +44,12 @@ public class ApiRouteManagerCache {
             }
         }
 
-        // sort once (IMPORTANT)
+        // sort path variable routes: most literal segments first (most specific match wins)
+        pathVariableList.sort((a, b) ->
+            countLiteralSegments(b.getPath()) - countLiteralSegments(a.getPath())
+        );
+
+        // sort wildcard routes: longest prefix first
         wildcardList.sort((a, b) ->
             b.getPath().length() - a.getPath().length()
         );
@@ -54,18 +63,24 @@ public class ApiRouteManagerCache {
         String normalizedPath = normalize(path);
         String key = buildKey(normalizedPath, method);
 
-        // 1. Exact match (O(1))
+        // 1. Exact match O(1)
         ApiRouteDto exact = exactMap.get(key);
         if (exact != null) {
             return exact;
         }
 
-        // 2. Wildcard match (FAST)
-        for (ApiRouteDto dto : wildcardList) {
-
+        // 2. Path variable match: /users/{id}, /items/{id}/details
+        for (ApiRouteDto dto : pathVariableList) {
             if (!dto.getMethod().equalsIgnoreCase(method)) continue;
+            if (matchesPathVariable(dto.getPath(), normalizedPath)) {
+                return dto;
+            }
+        }
 
-            if (normalizedPath.startsWith(dto.getPath())) {
+        // 3. Wildcard match: /api/**
+        for (ApiRouteDto dto : wildcardList) {
+            if (!dto.getMethod().equalsIgnoreCase(method)) continue;
+            if (normalizedPath.equals(dto.getPath()) || normalizedPath.startsWith(dto.getPath() + "/")) {
                 return dto;
             }
         }
@@ -83,6 +98,10 @@ public class ApiRouteManagerCache {
     }
 
     // ================= UTIL =================
+    private static boolean hasPathVariable(String path) {
+        return path != null && path.contains("{");
+    }
+
     private static boolean isWildcard(String path) {
         return path.endsWith("/**");
     }
@@ -97,11 +116,45 @@ public class ApiRouteManagerCache {
 
     private static String normalize(String path) {
         if (path == null || path.isEmpty()) return "/";
-
         if (path.length() > 1 && path.endsWith("/")) {
             return path.substring(0, path.length() - 1);
         }
-
         return path;
+    }
+
+    /**
+     * Matches a request path against a path variable pattern.
+     * Segments wrapped in {curly braces} match any single path segment.
+     * A ** segment matches all remaining segments.
+     *
+     * Examples:
+     *   /users/{id}            vs /users/123          → true
+     *   /users/{id}/posts      vs /users/123/posts     → true
+     *   /users/{id}/posts/**   vs /users/123/posts/1   → true
+     *   /users/{id}            vs /users/123/extra     → false
+     */
+    private static boolean matchesPathVariable(String pattern, String requestPath) {
+        String[] patternSegs = pattern.split("/", -1);
+        String[] requestSegs = requestPath.split("/", -1);
+
+        for (int i = 0; i < patternSegs.length; i++) {
+            String ps = patternSegs[i];
+            if ("**".equals(ps)) return true;
+            if (i >= requestSegs.length) return false;
+            if (ps.startsWith("{") && ps.endsWith("}")) continue;
+            if (!ps.equals(requestSegs[i])) return false;
+        }
+
+        return patternSegs.length == requestSegs.length;
+    }
+
+    private static int countLiteralSegments(String path) {
+        int count = 0;
+        for (String seg : path.split("/", -1)) {
+            if (!seg.isEmpty() && !seg.startsWith("{") && !"**".equals(seg)) {
+                count++;
+            }
+        }
+        return count;
     }
 }
