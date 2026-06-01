@@ -10,6 +10,7 @@ const EMPTY_FORM = {
   group_code: '', path: '', method: 'GET', description: '', application_id: '',
   is_public: 'N', is_encrypt: 'N', enable_circuit_breaker: 'Y',
   priority: 1, rate_limit: '', rate_limit_duration: '',
+  auth_type: 'JWT', required_roles: '', required_permissions: '',
 };
 
 // ── small helpers ──────────────────────────────────────────────────────────
@@ -141,6 +142,9 @@ export default function Routes() {
     priority:               r.priority               ?? 1,
     rate_limit:             r.rate_limit             ?? '',
     rate_limit_duration:    r.rate_limit_duration    ?? '',
+    auth_type:              r.auth_type              || 'JWT',
+    required_roles:         r.required_roles         || '',
+    required_permissions:   r.required_permissions   || '',
   });
 
   const openCreate = () => {
@@ -460,6 +464,41 @@ export default function Routes() {
               value={form.application_id}
               onChange={e => f('application_id', e.target.value)}
               placeholder="optional" />
+          </div>
+        </div>
+
+        {/* Row 5: Security — only relevant when is_public = N */}
+        <div style={{ borderTop: '1px solid #e2e8f0', marginTop: '.5rem', paddingTop: '1rem' }}>
+          <div style={{ fontSize: '.78rem', fontWeight: 700, color: '#64748b', letterSpacing: '.06em',
+            textTransform: 'uppercase', marginBottom: '.75rem' }}>
+            <i className="fa-solid fa-shield-halved" style={{ marginRight: '.4rem' }} />Security
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Auth Type</label>
+              <select className="form-select" value={form.auth_type} onChange={e => f('auth_type', e.target.value)}>
+                <option value="JWT">JWT</option>
+                <option value="OAUTH2">OAuth2 (Introspection)</option>
+                <option value="API_KEY">API Key</option>
+                <option value="NONE">None</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Required Roles</label>
+              <input className="form-control" value={form.required_roles}
+                onChange={e => f('required_roles', e.target.value)}
+                placeholder="ADMIN,MANAGER (comma-separated)"
+                disabled={form.is_public === 'Y' || form.auth_type === 'NONE'} />
+              <div className="form-hint">All listed roles must be present.</div>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Required Permissions</label>
+              <input className="form-control" value={form.required_permissions}
+                onChange={e => f('required_permissions', e.target.value)}
+                placeholder="read:users,write:orders"
+                disabled={form.is_public === 'Y' || form.auth_type === 'NONE'} />
+              <div className="form-hint">All listed permissions must be present.</div>
+            </div>
           </div>
         </div>
       </Modal>

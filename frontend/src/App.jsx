@@ -1,19 +1,25 @@
 import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import { ToastProvider } from './context/ToastContext';
-import Dashboard from './pages/Dashboard';
-import Groups    from './pages/Groups';
-import Health    from './pages/Health';
-import Registry  from './pages/Registry';
-import RoutesPage from './pages/Routes';
+import Dashboard       from './pages/Dashboard';
+import Groups          from './pages/Groups';
+import Health          from './pages/Health';
+import Registry        from './pages/Registry';
+import RoutesPage      from './pages/Routes';
+import ApiKeys         from './pages/ApiKeys';
+import IpAccessControl from './pages/IpAccessControl';
+import OAuth2Providers from './pages/OAuth2Providers';
 import { API } from './api/gateway';
 
 const TITLES = {
-  '/':         'Dashboard',
-  '/routes':   'Route Management',
-  '/groups':   'Service Groups',
-  '/registry': 'Service Registry',
-  '/health':   'Health Monitor',
+  '/':                  'Dashboard',
+  '/routes':            'Route Management',
+  '/groups':            'Service Groups',
+  '/registry':          'Service Registry',
+  '/health':            'Health Monitor',
+  '/security/api-keys': 'API Key Management',
+  '/security/ip-acl':   'IP Access Control',
+  '/security/oauth2':   'OAuth2 Providers',
 };
 
 function Layout() {
@@ -44,9 +50,12 @@ function Layout() {
             <Route path="/"         element={<Dashboard />} />
             <Route path="/routes"   element={<RoutesPage />} />
             <Route path="/groups"   element={<Groups />} />
-            <Route path="/registry" element={<Registry />} />
-            <Route path="/health"   element={<Health />} />
-            <Route path="*"         element={<Navigate to="/" replace />} />
+            <Route path="/registry"          element={<Registry />} />
+            <Route path="/health"            element={<Health />} />
+            <Route path="/security/api-keys" element={<ApiKeys />} />
+            <Route path="/security/ip-acl"   element={<IpAccessControl />} />
+            <Route path="/security/oauth2"   element={<OAuth2Providers />} />
+            <Route path="*"                  element={<Navigate to="/" replace />} />
           </Routes>
         </div>
       </div>

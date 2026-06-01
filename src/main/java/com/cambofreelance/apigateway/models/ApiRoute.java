@@ -72,4 +72,13 @@ public class ApiRoute extends BaseEntity implements Serializable {
 
     @Column("enable_circuit_breaker")
     private String enableCircuitBreaker;
+
+    @Column("auth_type")
+    private String authType;
+
+    @Column("required_roles")
+    private String requiredRoles;
+
+    @Column("required_permissions")
+    private String requiredPermissions;
 }

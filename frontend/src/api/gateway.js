@@ -37,4 +37,20 @@ export const API = {
   getInstances:         (svcId = '') => get(`/admin/health/instances${svcId ? '?serviceId=' + svcId : ''}`),
   triggerCheck:         ()           => post('/admin/health/check'),
   updateInstanceStatus: (id, status) => put(`/admin/health/instances/${id}/status`, { healthStatus: status }),
+
+  // IP Access Control
+  getIpAcl:    ()       => get('/admin/ip-acl'),
+  createIpAcl: (data)   => post('/admin/ip-acl', data),
+  deleteIpAcl: (id)     => del(`/admin/ip-acl/${id}`),
+
+  // API Keys
+  getApiKeys:  ()       => get('/admin/api-keys'),
+  createApiKey:(data)   => post('/admin/api-keys', data),
+  revokeApiKey:(id)     => del(`/admin/api-keys/${id}`),
+
+  // OAuth2 Providers
+  getOAuth2Providers:    ()          => get('/admin/oauth2-providers'),
+  createOAuth2Provider:  (data)      => post('/admin/oauth2-providers', data),
+  updateOAuth2Provider:  (id, data)  => put(`/admin/oauth2-providers/${id}`, data),
+  deleteOAuth2Provider:  (id)        => del(`/admin/oauth2-providers/${id}`),
 };

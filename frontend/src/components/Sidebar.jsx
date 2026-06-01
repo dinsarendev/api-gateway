@@ -24,6 +24,11 @@ export default function Sidebar() {
       <div className="sidebar-section">INFRASTRUCTURE</div>
       <NavItem to="/registry" icon="fa-server"       label="Service Registry" />
       <NavItem to="/health"   icon="fa-heart-pulse"  label="Health Monitor" />
+
+      <div className="sidebar-section">SECURITY</div>
+      <NavItem to="/security/api-keys" icon="fa-key"          label="API Keys" />
+      <NavItem to="/security/ip-acl"   icon="fa-shield-halved" label="IP Access Control" />
+      <NavItem to="/security/oauth2"   icon="fa-id-badge"     label="OAuth2 Providers" />
     </nav>
   );
 }

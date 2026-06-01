@@ -17,6 +17,9 @@ public record RouteApiRequest(
     @JsonProperty("rate_limit_duration")   Integer rateLimitDuration,
     Integer                                priority,
     @JsonProperty("start_time")            LocalDateTime startTime,
-    @JsonProperty("end_time")              LocalDateTime endTime
+    @JsonProperty("end_time")              LocalDateTime endTime,
+    @JsonProperty("auth_type")             String authType,
+    @JsonProperty("required_roles")        String requiredRoles,
+    @JsonProperty("required_permissions")  String requiredPermissions
 ) {}
 

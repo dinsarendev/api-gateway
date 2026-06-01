@@ -24,6 +24,9 @@ public record RouteApiResponse(
     @JsonProperty("created_by")            String createdBy,
     @JsonProperty("created_at")            LocalDateTime createdAt,
     @JsonProperty("updated_by")            String updatedBy,
-    @JsonProperty("updated_at")            LocalDateTime updatedAt
+    @JsonProperty("updated_at")            LocalDateTime updatedAt,
+    @JsonProperty("auth_type")             String authType,
+    @JsonProperty("required_roles")        String requiredRoles,
+    @JsonProperty("required_permissions")  String requiredPermissions
 ) {}
 

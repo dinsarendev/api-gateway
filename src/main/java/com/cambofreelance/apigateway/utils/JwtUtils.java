@@ -53,6 +53,30 @@ public class JwtUtils {
         }
     }
 
+    @SuppressWarnings("unchecked")
+    public java.util.List<String> getRolesFromToken(String token) {
+        try {
+            Object roles = Jwts.parserBuilder().setSigningKey(getSigningKey()).build()
+                .parseClaimsJws(token).getBody().get("roles");
+            if (roles instanceof java.util.List<?> list) return (java.util.List<String>) list;
+            if (roles instanceof String s && !s.isBlank())
+                return java.util.Arrays.asList(s.split(","));
+        } catch (Throwable ignored) {}
+        return java.util.List.of();
+    }
+
+    @SuppressWarnings("unchecked")
+    public java.util.List<String> getPermissionsFromToken(String token) {
+        try {
+            Object perms = Jwts.parserBuilder().setSigningKey(getSigningKey()).build()
+                .parseClaimsJws(token).getBody().get("permissions");
+            if (perms instanceof java.util.List<?> list) return (java.util.List<String>) list;
+            if (perms instanceof String s && !s.isBlank())
+                return java.util.Arrays.asList(s.split(","));
+        } catch (Throwable ignored) {}
+        return java.util.List.of();
+    }
+
     public boolean validateJwtToken(String authToken) {
         try {
             Jwts.parserBuilder()
