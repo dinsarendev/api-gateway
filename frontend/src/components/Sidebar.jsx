@@ -1,7 +1,8 @@
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import { auth } from '../auth';
 import { API }  from '../api/gateway';
 import { useToast } from '../context/ToastContext';
+import { useAuth, PERMS } from '../context/AuthContext';
 
 const NavItem = ({ to, icon, label }) => (
   <NavLink to={to} className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
@@ -10,8 +11,8 @@ const NavItem = ({ to, icon, label }) => (
 );
 
 export default function Sidebar() {
-  const toast    = useToast();
-  const navigate = useNavigate();
+  const toast   = useToast();
+  const { can } = useAuth();
 
   const logout = async () => {
     try { await API.logout(); } catch { /* ignore */ }
@@ -29,51 +30,78 @@ export default function Sidebar() {
         <span>API Gateway</span>
       </div>
 
-      {/* Logged-in user */}
-      <div style={{
-        padding: '.75rem 1.2rem', borderBottom: '1px solid #1e293b',
-        display: 'flex', alignItems: 'center', gap: '.6rem',
-      }}>
+      {/* Logged-in user — links to profile page */}
+      <NavLink to="/profile" style={{ textDecoration: 'none' }}>
         <div style={{
-          width: 30, height: 30, borderRadius: '50%',
-          background: '#1d4ed8', display: 'flex', alignItems: 'center',
-          justifyContent: 'center', fontSize: '.8rem', color: '#fff', fontWeight: 700, flexShrink: 0,
-        }}>
-          {(fullName || username || '?')[0].toUpperCase()}
-        </div>
-        <div style={{ overflow: 'hidden' }}>
-          <div style={{ fontSize: '.82rem', fontWeight: 600, color: '#f1f5f9',
-            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {fullName || username}
+          padding: '.75rem 1.2rem', borderBottom: '1px solid #1e293b',
+          display: 'flex', alignItems: 'center', gap: '.6rem',
+          cursor: 'pointer',
+        }}
+          onMouseEnter={e => e.currentTarget.style.background = '#1e293b'}
+          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+        >
+          <div style={{
+            width: 30, height: 30, borderRadius: '50%',
+            background: '#1d4ed8', display: 'flex', alignItems: 'center',
+            justifyContent: 'center', fontSize: '.8rem', color: '#fff', fontWeight: 700, flexShrink: 0,
+          }}>
+            {(fullName || username || '?')[0].toUpperCase()}
           </div>
-          {fullName && (
-            <div style={{ fontSize: '.7rem', color: '#64748b',
+          <div style={{ overflow: 'hidden', flex: 1 }}>
+            <div style={{ fontSize: '.82rem', fontWeight: 600, color: '#f1f5f9',
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              @{username}
+              {fullName || username}
             </div>
-          )}
+            {fullName && (
+              <div style={{ fontSize: '.7rem', color: '#64748b',
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                @{username}
+              </div>
+            )}
+          </div>
+          <i className="fa-solid fa-pen-to-square" style={{ fontSize: '.7rem', color: '#475569', flexShrink: 0 }} />
         </div>
-      </div>
+      </NavLink>
 
       <div className="sidebar-section">OVERVIEW</div>
-      <NavItem to="/"         icon="fa-gauge-high"   label="Dashboard" />
+      <NavItem to="/" icon="fa-gauge-high" label="Dashboard" />
 
-      <div className="sidebar-section">ROUTING</div>
-      <NavItem to="/routes"   icon="fa-route"        label="Routes" />
-      <NavItem to="/groups"   icon="fa-layer-group"  label="Service Groups" />
+      {(can(PERMS.ROUTE_READ) || can(PERMS.GROUP_READ)) && (
+        <div className="sidebar-section">ROUTING</div>
+      )}
+      {can(PERMS.ROUTE_READ) && (
+        <NavItem to="/routes" icon="fa-route" label="Routes" />
+      )}
+      {can(PERMS.GROUP_READ) && (
+        <NavItem to="/groups" icon="fa-layer-group" label="Service Groups" />
+      )}
 
-      <div className="sidebar-section">INFRASTRUCTURE</div>
-      <NavItem to="/registry" icon="fa-server"       label="Service Registry" />
-      <NavItem to="/health"   icon="fa-heart-pulse"  label="Health Monitor" />
+      {(can(PERMS.REGISTRY_READ) || can(PERMS.HEALTH_READ)) && (
+        <div className="sidebar-section">INFRASTRUCTURE</div>
+      )}
+      {can(PERMS.REGISTRY_READ) && (
+        <NavItem to="/registry" icon="fa-server" label="Service Registry" />
+      )}
+      {can(PERMS.HEALTH_READ) && (
+        <NavItem to="/health" icon="fa-heart-pulse" label="Health Monitor" />
+      )}
 
-      <div className="sidebar-section">SECURITY</div>
-      <NavItem to="/security/api-keys" icon="fa-key"           label="API Keys" />
-      <NavItem to="/security/ip-acl"   icon="fa-shield-halved" label="IP Access Control" />
-      <NavItem to="/security/oauth2"   icon="fa-id-badge"      label="OAuth2 Providers" />
+      {can(PERMS.SECURITY_READ) && (
+        <>
+          <div className="sidebar-section">SECURITY</div>
+          <NavItem to="/security/api-keys" icon="fa-key"           label="API Keys" />
+          <NavItem to="/security/ip-acl"   icon="fa-shield-halved" label="IP Access Control" />
+          <NavItem to="/security/oauth2"   icon="fa-id-badge"      label="OAuth2 Providers" />
+        </>
+      )}
 
-      <div className="sidebar-section">ADMINISTRATION</div>
-      <NavItem to="/users" icon="fa-users"       label="Users" />
-      <NavItem to="/roles" icon="fa-user-shield" label="Roles" />
+      {can(PERMS.USER_READ) && (
+        <>
+          <div className="sidebar-section">ADMINISTRATION</div>
+          <NavItem to="/users" icon="fa-users"       label="Users" />
+          <NavItem to="/roles" icon="fa-user-shield" label="Roles" />
+        </>
+      )}
 
       {/* Logout — pinned to bottom */}
       <div style={{ marginTop: 'auto', padding: '1rem 1.2rem', borderTop: '1px solid #1e293b' }}>

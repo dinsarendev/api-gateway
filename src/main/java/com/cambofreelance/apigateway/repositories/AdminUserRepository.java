@@ -45,4 +45,12 @@ public interface AdminUserRepository extends R2dbcRepository<AdminUser, Long> {
     @Modifying
     @Query("UPDATE public.admin_user SET status = :status, updated_at = :now, updated_by = :updatedBy WHERE id = :id")
     Mono<Integer> updateStatus(Long id, String status, LocalDateTime now, String updatedBy);
+
+    @Modifying
+    @Query("UPDATE public.admin_user SET full_name = :fullName, email = :email, updated_at = :now, updated_by = :updatedBy WHERE id = :id")
+    Mono<Integer> updateProfile(Long id, String fullName, String email, LocalDateTime now, String updatedBy);
+
+    @Modifying
+    @Query("UPDATE public.admin_user SET password_hash = :passwordHash, updated_at = :now, updated_by = :updatedBy WHERE id = :id")
+    Mono<Integer> updatePassword(Long id, String passwordHash, LocalDateTime now, String updatedBy);
 }

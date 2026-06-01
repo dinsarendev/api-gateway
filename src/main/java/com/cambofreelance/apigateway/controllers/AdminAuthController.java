@@ -1,5 +1,6 @@
 package com.cambofreelance.apigateway.controllers;
 
+import com.cambofreelance.apigateway.repositories.AdminPermissionRepository;
 import com.cambofreelance.apigateway.repositories.AdminRoleRepository;
 import com.cambofreelance.apigateway.repositories.AdminUserRepository;
 import com.cambofreelance.apigateway.security.SecurityService.UnauthorizedException;
@@ -20,9 +21,10 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class AdminAuthController {
 
-    private final AdminAuthService authService;
-    private final AdminUserRepository userRepository;
-    private final AdminRoleRepository roleRepository;
+    private final AdminAuthService          authService;
+    private final AdminUserRepository       userRepository;
+    private final AdminRoleRepository       roleRepository;
+    private final AdminPermissionRepository permissionRepository;
 
     @PostMapping("/login")
     public Mono<ResponseEntity<TokenPair>> login(@RequestBody LoginRequest req) {
@@ -52,22 +54,61 @@ public class AdminAuthController {
         if (username == null) return Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
 
         return userRepository.findActiveByUsername(username)
-            .flatMap(user -> roleRepository.findByUserId(user.getId())
-                .map(r -> r.getName())
-                .collectList()
-                .map(roles -> ResponseEntity.ok(Map.<String, Object>of(
-                    "username",  user.getUsername(),
-                    "full_name", user.getFullName() != null ? user.getFullName() : "",
-                    "email",     user.getEmail() != null ? user.getEmail() : "",
-                    "roles",     roles
-                )))
+            .flatMap(user ->
+                roleRepository.findByUserId(user.getId()).map(r -> r.getName()).collectList()
+                    .flatMap(roles -> permissionRepository.findByUserId(user.getId())
+                        .map(p -> p.getName()).collectList()
+                        .map(perms -> ResponseEntity.ok(Map.<String, Object>of(
+                            "username",    user.getUsername(),
+                            "full_name",   user.getFullName()  != null ? user.getFullName()  : "",
+                            "email",       user.getEmail()     != null ? user.getEmail()     : "",
+                            "roles",       roles,
+                            "permissions", perms
+                        ))))
             )
             .defaultIfEmpty(ResponseEntity.status(HttpStatus.NOT_FOUND).build());
+    }
+
+    @PutMapping("/profile")
+    public Mono<ResponseEntity<Map<String, Object>>> updateProfile(
+            ServerWebExchange exchange,
+            @RequestBody UpdateProfileRequest req) {
+        String username = exchange.getRequest().getHeaders().getFirst("X-Admin-User");
+        if (username == null) return Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
+
+        return authService.updateProfile(username, req.fullName(), req.email())
+            .thenReturn(ResponseEntity.ok(Map.<String, Object>of("message", "Profile updated successfully")))
+            .onErrorResume(UnauthorizedException.class,
+                e -> Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()));
+    }
+
+    @PutMapping("/change-password")
+    public Mono<ResponseEntity<Map<String, Object>>> changePassword(
+            ServerWebExchange exchange,
+            @RequestBody ChangePasswordRequest req) {
+        String username = exchange.getRequest().getHeaders().getFirst("X-Admin-User");
+        if (username == null) return Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
+
+        return authService.changePassword(username, req.currentPassword(), req.newPassword())
+            .thenReturn(ResponseEntity.ok(Map.<String, Object>of("message", "Password changed successfully")))
+            .onErrorResume(UnauthorizedException.class,
+                e -> Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.<String, Object>of("message", e.getMessage()))));
     }
 
     public record LoginRequest(String username, String password) {}
 
     public record RefreshRequest(
         @JsonProperty("refresh_token") String refreshToken
+    ) {}
+
+    public record UpdateProfileRequest(
+        @JsonProperty("full_name") String fullName,
+        String email
+    ) {}
+
+    public record ChangePasswordRequest(
+        @JsonProperty("current_password") String currentPassword,
+        @JsonProperty("new_password")     String newPassword
     ) {}
 }

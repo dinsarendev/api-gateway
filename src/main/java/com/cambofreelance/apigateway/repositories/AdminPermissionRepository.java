@@ -22,4 +22,13 @@ public interface AdminPermissionRepository extends R2dbcRepository<AdminPermissi
         WHERE rp.role_id = :roleId AND p.status = 'ACT'
         """)
     Flux<AdminPermission> findByRoleId(Long roleId);
+
+    @Query("""
+        SELECT DISTINCT p.* FROM public.admin_permission p
+        JOIN public.role_permission rp ON rp.permission_id = p.id
+        JOIN public.user_role ur ON ur.role_id = rp.role_id
+        WHERE ur.user_id = :userId AND p.status = 'ACT'
+        ORDER BY p.name
+        """)
+    Flux<AdminPermission> findByUserId(Long userId);
 }

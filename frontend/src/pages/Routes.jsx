@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { API } from '../api/gateway';
 import Modal from '../components/Modal';
 import { useToast } from '../context/ToastContext';
+import { useAuth, PERMS } from '../context/AuthContext';
 
 const PAGE_SIZE = 15;
 
@@ -67,6 +68,8 @@ function Pagination({ page, total, pageSize, onChange }) {
 // ── Main component ─────────────────────────────────────────────────────────
 export default function Routes() {
   const toast = useToast();
+  const { can } = useAuth();
+  const canWrite = can(PERMS.ROUTE_WRITE);
   const [searchParams, setSearchParams] = useSearchParams();
 
   // data
@@ -257,12 +260,16 @@ export default function Routes() {
           value={search} onChange={e => setSearch(e.target.value)} />
 
         <div className="ms-auto">
-          <button className="btn btn-secondary btn-sm" onClick={reload}>
-            <i className="fa-solid fa-arrows-rotate" /> Reload Gateway
-          </button>
-          <button className="btn btn-primary btn-sm" onClick={openCreate}>
-            <i className="fa-solid fa-plus" /> New Route
-          </button>
+          {canWrite && (
+            <button className="btn btn-secondary btn-sm" onClick={reload}>
+              <i className="fa-solid fa-arrows-rotate" /> Reload Gateway
+            </button>
+          )}
+          {canWrite && (
+            <button className="btn btn-primary btn-sm" onClick={openCreate}>
+              <i className="fa-solid fa-plus" /> New Route
+            </button>
+          )}
         </div>
       </div>
 
@@ -322,12 +329,12 @@ export default function Routes() {
                           </td>
                           <td>
                             <div className="actions-row">
-                              <button className="btn-action" title="Edit"      onClick={() => openEdit(r)}><i className="fa-solid fa-pen"          /></button>
-                              <button className="btn-action" title="Duplicate" onClick={() => openCopy(r)}><i className="fa-solid fa-copy"         /></button>
-                              {r.status === 'ACT'
+                              {canWrite && <button className="btn-action" title="Edit"      onClick={() => openEdit(r)}><i className="fa-solid fa-pen"  /></button>}
+                              {canWrite && <button className="btn-action" title="Duplicate" onClick={() => openCopy(r)}><i className="fa-solid fa-copy" /></button>}
+                              {canWrite && (r.status === 'ACT'
                                 ? <button className="btn-action warning" title="Disable" onClick={() => toggle(r.id, 'disable')}><i className="fa-solid fa-pause" /></button>
-                                : <button className="btn-action success" title="Enable"  onClick={() => toggle(r.id, 'enable')} ><i className="fa-solid fa-play"  /></button>}
-                              <button className="btn-action danger"   title="Delete"     onClick={() => remove(r.id)}           ><i className="fa-solid fa-trash"  /></button>
+                                : <button className="btn-action success" title="Enable"  onClick={() => toggle(r.id, 'enable')} ><i className="fa-solid fa-play"  /></button>)}
+                              {canWrite && <button className="btn-action danger" title="Delete" onClick={() => remove(r.id)}><i className="fa-solid fa-trash" /></button>}
                             </div>
                           </td>
                         </tr>

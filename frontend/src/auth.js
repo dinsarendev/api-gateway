@@ -1,10 +1,11 @@
 const K = {
-  ACCESS:     'gw_access_token',
-  REFRESH:    'gw_refresh_token',
-  EXPIRES_AT: 'gw_expires_at',
-  USERNAME:   'gw_username',
-  FULL_NAME:  'gw_full_name',
-  ROLES:      'gw_roles',
+  ACCESS:       'gw_access_token',
+  REFRESH:      'gw_refresh_token',
+  EXPIRES_AT:   'gw_expires_at',
+  USERNAME:     'gw_username',
+  FULL_NAME:    'gw_full_name',
+  ROLES:        'gw_roles',
+  PERMISSIONS:  'gw_permissions',
 };
 
 let refreshPromise = null; // mutex — prevents concurrent refresh calls
@@ -15,17 +16,19 @@ export const auth = {
   getRefreshToken: () => localStorage.getItem(K.REFRESH),
   getUsername:     () => localStorage.getItem(K.USERNAME) || '',
   getFullName:     () => localStorage.getItem(K.FULL_NAME) || '',
-  getRoles:        () => JSON.parse(localStorage.getItem(K.ROLES) || '[]'),
+  getRoles:        () => JSON.parse(localStorage.getItem(K.ROLES)       || '[]'),
+  getPermissions:  () => JSON.parse(localStorage.getItem(K.PERMISSIONS) || '[]'),
   isLoggedIn:      () => !!localStorage.getItem(K.ACCESS),
 
   // ── Store after login / refresh ─────────────────────────────────────────────
-  setTokens({ access_token, refresh_token, expires_in, username, full_name, roles }) {
+  setTokens({ access_token, refresh_token, expires_in, username, full_name, roles, permissions }) {
     localStorage.setItem(K.ACCESS,    access_token);
     localStorage.setItem(K.REFRESH,   refresh_token);
     localStorage.setItem(K.EXPIRES_AT, String(Date.now() + expires_in * 1000));
-    if (username)  localStorage.setItem(K.USERNAME,  username);
-    if (full_name) localStorage.setItem(K.FULL_NAME, full_name);
-    if (roles)     localStorage.setItem(K.ROLES,     JSON.stringify(roles));
+    if (username)     localStorage.setItem(K.USERNAME,     username);
+    if (full_name)    localStorage.setItem(K.FULL_NAME,    full_name);
+    if (roles)        localStorage.setItem(K.ROLES,        JSON.stringify(roles));
+    if (permissions)  localStorage.setItem(K.PERMISSIONS,  JSON.stringify(permissions));
   },
 
   clear() {

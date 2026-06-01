@@ -2,13 +2,16 @@ import { useEffect, useMemo, useState } from 'react';
 import { API } from '../api/gateway';
 import Modal from '../components/Modal';
 import { useToast } from '../context/ToastContext';
+import { useAuth, PERMS } from '../context/AuthContext';
 
 const EMPTY = { type: 'BLACKLIST', ip_cidr: '', scope: 'GLOBAL', scope_id: '', description: '' };
 
 const SCOPE_LABELS = { GLOBAL: 'All Routes', GROUP: 'Service Group', ROUTE: 'Route ID' };
 
 export default function IpAccessControl() {
-  const toast = useToast();
+  const toast    = useToast();
+  const { can }  = useAuth();
+  const canWrite = can(PERMS.SECURITY_WRITE);
   const [rules,   setRules]   = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal,   setModal]   = useState(false);
@@ -64,11 +67,13 @@ export default function IpAccessControl() {
         </select>
         <input className="form-control" style={{ width: '200px' }} placeholder="Search IP or scope…"
           value={search} onChange={e => setSearch(e.target.value)} />
-        <div className="ms-auto">
-          <button className="btn btn-primary btn-sm" onClick={() => { setForm(EMPTY); setModal(true); }}>
-            <i className="fa-solid fa-plus" /> Add Rule
-          </button>
-        </div>
+        {canWrite && (
+          <div className="ms-auto">
+            <button className="btn btn-primary btn-sm" onClick={() => { setForm(EMPTY); setModal(true); }}>
+              <i className="fa-solid fa-plus" /> Add Rule
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="card">
@@ -94,9 +99,11 @@ export default function IpAccessControl() {
                       <td className="text-sm text-muted">{r.scope_id || '—'}</td>
                       <td className="text-sm text-muted">{r.description || '—'}</td>
                       <td>
-                        <button className="btn-action danger" title="Delete" onClick={() => remove(r.id)}>
-                          <i className="fa-solid fa-trash" />
-                        </button>
+                        {canWrite && (
+                          <button className="btn-action danger" title="Delete" onClick={() => remove(r.id)}>
+                            <i className="fa-solid fa-trash" />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}

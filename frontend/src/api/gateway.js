@@ -33,7 +33,9 @@ export const API = {
   login:   (data)  => pub('/admin/auth/login',   { method: 'POST', body: JSON.stringify(data) }),
   refresh: (token) => pub('/admin/auth/refresh', { method: 'POST', body: JSON.stringify({ refresh_token: token }) }),
   logout:  ()      => req('/admin/auth/logout',  { method: 'POST', body: JSON.stringify({ refresh_token: auth.getRefreshToken() }) }),
-  profile: ()      => get('/admin/auth/profile'),
+  profile:        ()     => get('/admin/auth/profile'),
+  updateProfile:  (data) => put('/admin/auth/profile', data),
+  changePassword: (data) => put('/admin/auth/change-password', data),
 
   // ── Dashboard ────────────────────────────────────────────────────────────
   dashboard:       () => get('/admin/dashboard'),

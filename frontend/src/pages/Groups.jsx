@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { API } from '../api/gateway';
 import Modal from '../components/Modal';
 import { useToast } from '../context/ToastContext';
+import { useAuth, PERMS } from '../context/AuthContext';
 
 const EMPTY    = { code: '', uri: '' };
 const PAGE_SIZE = 10;
@@ -43,8 +44,10 @@ function Pagination({ page, total, pageSize, onChange }) {
 }
 
 export default function Groups() {
-  const toast    = useToast();
-  const navigate = useNavigate();
+  const toast     = useToast();
+  const navigate  = useNavigate();
+  const { can }   = useAuth();
+  const canWrite  = can(PERMS.GROUP_WRITE);
 
   const [groups,  setGroups]  = useState([]);
   const [loading, setLoading] = useState(true);
@@ -115,11 +118,13 @@ export default function Groups() {
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
-        <div className="ms-auto">
-          <button className="btn btn-primary btn-sm" onClick={openCreate}>
-            <i className="fa-solid fa-plus" /> New Group
-          </button>
-        </div>
+        {canWrite && (
+          <div className="ms-auto">
+            <button className="btn btn-primary btn-sm" onClick={openCreate}>
+              <i className="fa-solid fa-plus" /> New Group
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="card">
@@ -161,12 +166,16 @@ export default function Groups() {
                           <button className="btn-action" title="View Routes" onClick={() => viewRoutes(g.code)}>
                             <i className="fa-solid fa-route" />
                           </button>
-                          <button className="btn-action" title="Edit" onClick={() => openEdit(g)}>
-                            <i className="fa-solid fa-pen" />
-                          </button>
-                          <button className="btn-action danger" title="Delete" onClick={() => remove(g.id, g.code)}>
-                            <i className="fa-solid fa-trash" />
-                          </button>
+                          {canWrite && (
+                            <button className="btn-action" title="Edit" onClick={() => openEdit(g)}>
+                              <i className="fa-solid fa-pen" />
+                            </button>
+                          )}
+                          {canWrite && (
+                            <button className="btn-action danger" title="Delete" onClick={() => remove(g.id, g.code)}>
+                              <i className="fa-solid fa-trash" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

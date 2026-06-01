@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { API } from '../api/gateway';
 import Modal from '../components/Modal';
 import { useToast } from '../context/ToastContext';
+import { useAuth, PERMS } from '../context/AuthContext';
 
 const PAGE_SIZE = 15;
 
@@ -155,7 +156,9 @@ function PermissionGrid({ allPermissions, selected, onChange }) {
 
 // ── Main component ─────────────────────────────────────────────────────────
 export default function Roles() {
-  const toast = useToast();
+  const toast    = useToast();
+  const { can }  = useAuth();
+  const canWrite = can(PERMS.USER_WRITE);
 
   const [roles,       setRoles]       = useState([]);
   const [total,       setTotal]       = useState(0);
@@ -278,11 +281,13 @@ export default function Roles() {
           onChange={e => setSearch(e.target.value)}
         />
 
-        <div className="ms-auto">
-          <button className="btn btn-primary btn-sm" onClick={openCreate}>
-            <i className="fa-solid fa-plus" /> New Role
-          </button>
-        </div>
+        {canWrite && (
+          <div className="ms-auto">
+            <button className="btn btn-primary btn-sm" onClick={openCreate}>
+              <i className="fa-solid fa-plus" /> New Role
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Table */}
@@ -351,17 +356,19 @@ export default function Roles() {
                         </td>
                         <td>
                           <div className="actions-row">
-                            <button className="btn-action" title="Edit" onClick={() => openEdit(r)}>
-                              <i className="fa-solid fa-pen" />
-                            </button>
-                            {r.status === 'ACT'
+                            {canWrite && (
+                              <button className="btn-action" title="Edit" onClick={() => openEdit(r)}>
+                                <i className="fa-solid fa-pen" />
+                              </button>
+                            )}
+                            {canWrite && (r.status === 'ACT'
                               ? <button className="btn-action warning" title="Deactivate" onClick={() => toggleStatus(r)}>
                                   <i className="fa-solid fa-pause" />
                                 </button>
                               : <button className="btn-action success" title="Activate" onClick={() => toggleStatus(r)}>
                                   <i className="fa-solid fa-play" />
                                 </button>
-                            }
+                            )}
                           </div>
                         </td>
                       </tr>

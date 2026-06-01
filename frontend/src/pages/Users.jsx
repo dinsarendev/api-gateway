@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { API } from '../api/gateway';
 import Modal from '../components/Modal';
 import { useToast } from '../context/ToastContext';
+import { useAuth, PERMS } from '../context/AuthContext';
 
 const PAGE_SIZE = 15;
 
@@ -51,7 +52,9 @@ function Pagination({ page, total, pageSize, onChange }) {
 
 // ── Main component ─────────────────────────────────────────────────────────
 export default function Users() {
-  const toast = useToast();
+  const toast    = useToast();
+  const { can }  = useAuth();
+  const canWrite = can(PERMS.USER_WRITE);
 
   // data
   const [users,   setUsers]   = useState([]);
@@ -197,11 +200,13 @@ export default function Users() {
           onChange={e => setSearch(e.target.value)}
         />
 
-        <div className="ms-auto">
-          <button className="btn btn-primary btn-sm" onClick={openCreate}>
-            <i className="fa-solid fa-plus" /> New User
-          </button>
-        </div>
+        {canWrite && (
+          <div className="ms-auto">
+            <button className="btn btn-primary btn-sm" onClick={openCreate}>
+              <i className="fa-solid fa-plus" /> New User
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Table */}
@@ -259,20 +264,24 @@ export default function Users() {
                         </td>
                         <td>
                           <div className="actions-row">
-                            <button className="btn-action" title="Edit" onClick={() => openEdit(u)}>
-                              <i className="fa-solid fa-pen" />
-                            </button>
-                            {u.status === 'ACT'
+                            {canWrite && (
+                              <button className="btn-action" title="Edit" onClick={() => openEdit(u)}>
+                                <i className="fa-solid fa-pen" />
+                              </button>
+                            )}
+                            {canWrite && (u.status === 'ACT'
                               ? <button className="btn-action warning" title="Deactivate" onClick={() => toggleStatus(u)}>
                                   <i className="fa-solid fa-pause" />
                                 </button>
                               : <button className="btn-action success" title="Activate" onClick={() => toggleStatus(u)}>
                                   <i className="fa-solid fa-play" />
                                 </button>
-                            }
-                            <button className="btn-action danger" title="Delete" onClick={() => remove(u)}>
-                              <i className="fa-solid fa-trash" />
-                            </button>
+                            )}
+                            {canWrite && (
+                              <button className="btn-action danger" title="Delete" onClick={() => remove(u)}>
+                                <i className="fa-solid fa-trash" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>

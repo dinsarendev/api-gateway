@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import { ToastProvider } from './context/ToastContext';
+import { AuthProvider } from './context/AuthContext';
 import Dashboard       from './pages/Dashboard';
 import Groups          from './pages/Groups';
 import Health          from './pages/Health';
@@ -12,6 +13,7 @@ import IpAccessControl from './pages/IpAccessControl';
 import OAuth2Providers from './pages/OAuth2Providers';
 import Users           from './pages/Users';
 import Roles           from './pages/Roles';
+import Profile         from './pages/Profile';
 import Login           from './pages/Login';
 import { auth } from './auth';
 
@@ -26,6 +28,7 @@ const TITLES = {
   '/security/oauth2':   'OAuth2 Providers',
   '/users':             'User Management',
   '/roles':             'Role Management',
+  '/profile':           'My Profile',
 };
 
 // eslint-disable-next-line no-unused-vars
@@ -60,6 +63,7 @@ function Layout({ onLogout }) {
             <Route path="/security/oauth2"   element={<OAuth2Providers />} />
             <Route path="/users"             element={<Users />} />
             <Route path="/roles"             element={<Roles />} />
+            <Route path="/profile"           element={<Profile />} />
             <Route path="*"                  element={<Navigate to="/" replace />} />
           </Routes>
         </div>
@@ -77,7 +81,7 @@ export default function App() {
     <HashRouter>
       <ToastProvider>
         {loggedIn
-          ? <Layout />
+          ? <AuthProvider><Layout /></AuthProvider>
           : <Login onLogin={handleLogin} />
         }
       </ToastProvider>

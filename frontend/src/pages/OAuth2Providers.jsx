@@ -2,11 +2,14 @@ import { useEffect, useState } from 'react';
 import { API } from '../api/gateway';
 import Modal from '../components/Modal';
 import { useToast } from '../context/ToastContext';
+import { useAuth, PERMS } from '../context/AuthContext';
 
 const EMPTY = { name: '', introspection_uri: '', client_id: '', client_secret: '' };
 
 export default function OAuth2Providers() {
-  const toast = useToast();
+  const toast    = useToast();
+  const { can }  = useAuth();
+  const canWrite = can(PERMS.SECURITY_WRITE);
   const [providers, setProviders] = useState([]);
   const [loading,   setLoading]   = useState(true);
   const [modal,     setModal]     = useState(false);
@@ -57,11 +60,13 @@ export default function OAuth2Providers() {
   return (
     <div>
       <div className="filter-bar">
-        <div className="ms-auto">
-          <button className="btn btn-primary btn-sm" onClick={openCreate}>
-            <i className="fa-solid fa-plus" /> New Provider
-          </button>
-        </div>
+        {canWrite && (
+          <div className="ms-auto">
+            <button className="btn btn-primary btn-sm" onClick={openCreate}>
+              <i className="fa-solid fa-plus" /> New Provider
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="card">
@@ -84,8 +89,8 @@ export default function OAuth2Providers() {
                       <td><span className={`badge badge-${p.status === 'ACT' ? 'act' : 'inact'}`}>{p.status === 'ACT' ? 'Active' : 'Inactive'}</span></td>
                       <td>
                         <div className="actions-row">
-                          <button className="btn-action" title="Edit" onClick={() => openEdit(p)}><i className="fa-solid fa-pen" /></button>
-                          <button className="btn-action danger" title="Delete" onClick={() => remove(p.id, p.name)}><i className="fa-solid fa-trash" /></button>
+                          {canWrite && <button className="btn-action" title="Edit" onClick={() => openEdit(p)}><i className="fa-solid fa-pen" /></button>}
+                          {canWrite && <button className="btn-action danger" title="Delete" onClick={() => remove(p.id, p.name)}><i className="fa-solid fa-trash" /></button>}
                         </div>
                       </td>
                     </tr>

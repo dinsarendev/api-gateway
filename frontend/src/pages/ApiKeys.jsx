@@ -2,11 +2,14 @@ import { useEffect, useState } from 'react';
 import { API } from '../api/gateway';
 import Modal from '../components/Modal';
 import { useToast } from '../context/ToastContext';
+import { useAuth, PERMS } from '../context/AuthContext';
 
 const EMPTY = { name: '', client_id: '', roles: '', permissions: '', expires_at: '' };
 
 export default function ApiKeys() {
-  const toast = useToast();
+  const toast    = useToast();
+  const { can }  = useAuth();
+  const canWrite = can(PERMS.SECURITY_WRITE);
   const [keys,    setKeys]    = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal,   setModal]   = useState(false);
@@ -72,11 +75,13 @@ export default function ApiKeys() {
       )}
 
       <div className="filter-bar">
-        <div className="ms-auto">
-          <button className="btn btn-primary btn-sm" onClick={() => { setForm(EMPTY); setModal(true); }}>
-            <i className="fa-solid fa-plus" /> New API Key
-          </button>
-        </div>
+        {canWrite && (
+          <div className="ms-auto">
+            <button className="btn btn-primary btn-sm" onClick={() => { setForm(EMPTY); setModal(true); }}>
+              <i className="fa-solid fa-plus" /> New API Key
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="card">
@@ -100,9 +105,11 @@ export default function ApiKeys() {
                       <td className="text-sm text-muted">{fmt(k.expires_at)}</td>
                       <td className="text-sm text-muted">{fmt(k.last_used_at)}</td>
                       <td>
-                        <button className="btn-action danger" title="Revoke" onClick={() => revoke(k.id, k.name)}>
-                          <i className="fa-solid fa-ban" />
-                        </button>
+                        {canWrite && (
+                          <button className="btn-action danger" title="Revoke" onClick={() => revoke(k.id, k.name)}>
+                            <i className="fa-solid fa-ban" />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}

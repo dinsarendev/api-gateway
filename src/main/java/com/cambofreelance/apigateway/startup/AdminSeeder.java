@@ -17,11 +17,11 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AdminSeeder {
 
-    private final AdminUserRepository       userRepository;
-    private final AdminRoleRepository       roleRepository;
-    private final AdminPermissionRepository permissionRepository;
-    private final UserRoleRepository        userRoleRepository;
-    private final RolePermissionRepository  rolePermissionRepository;
+    private final AdminUserRepository        userRepository;
+    private final AdminRoleRepository        roleRepository;
+    private final AdminPermissionRepository  permissionRepository;
+    private final UserRoleRepository         userRoleRepository;
+    private final RolePermissionRepository   rolePermissionRepository;
 
     private static final List<String[]> DEFAULT_PERMISSIONS = List.of(
         new String[]{"ROUTE_READ",       "View routes"},
@@ -33,91 +33,118 @@ public class AdminSeeder {
         new String[]{"HEALTH_READ",      "View health monitor"},
         new String[]{"SECURITY_READ",    "View security settings"},
         new String[]{"SECURITY_WRITE",   "Manage API keys, IP rules, OAuth2 providers"},
-        new String[]{"USER_READ",        "View admin users"},
-        new String[]{"USER_WRITE",       "Create / update / delete admin users"}
+        new String[]{"USER_READ",        "View admin users and roles"},
+        new String[]{"USER_WRITE",       "Create / update / delete admin users and roles"}
     );
 
     @EventListener(ApplicationReadyEvent.class)
     public void seed() {
         try {
-            Long userCount = userRepository.count().block();
-            if (userCount != null && userCount > 0) {
-                log.info("Admin users already exist — skipping seed");
-                return;
-            }
-
-            log.info("Seeding default admin user and roles...");
-
-            // ── Permissions ───────────────────────────────────────────────────
-            List<AdminPermission> savedPerms = (List<AdminPermission>) DEFAULT_PERMISSIONS.stream()
-                .map(p -> permissionRepository.save(AdminPermission.builder()
-                    .name(p[0]).description(p[1])
-                    .createdAt(LocalDateTime.now()).createdBy("SYS")
-                    .build()).block())
+            // ── 1. Upsert all permissions ─────────────────────────────────────
+            List<AdminPermission> allPerms = DEFAULT_PERMISSIONS.stream()
+                .map(p -> upsertPermission(p[0], p[1]))
                 .toList();
 
-            // ── Role: SUPER_ADMIN ─────────────────────────────────────────────
-            AdminRole superAdmin = roleRepository.save(AdminRole.builder()
-                .name("SUPER_ADMIN").description("Full access to all admin functions")
-                .createdAt(LocalDateTime.now()).createdBy("SYS")
-                .build()).block();
+            // ── 2. Upsert SUPER_ADMIN role ────────────────────────────────────
+            AdminRole superAdmin = upsertRole("SUPER_ADMIN", "Full access to all admin functions");
 
-            savedPerms.forEach(perm ->
-                rolePermissionRepository.save(RolePermission.builder()
-                    .roleId(superAdmin.getId())
-                    .permissionId(perm.getId())
-                    .build()).block()
+            // ── 3. Ensure SUPER_ADMIN has every permission ────────────────────
+            for (AdminPermission perm : allPerms) {
+                rolePermissionRepository
+                    .findByRoleIdAndPermissionId(superAdmin.getId(), perm.getId())
+                    .switchIfEmpty(rolePermissionRepository.save(
+                        RolePermission.builder()
+                            .roleId(superAdmin.getId())
+                            .permissionId(perm.getId())
+                            .build()))
+                    .block();
+            }
+
+            // ── 4. Upsert OPERATOR role + permissions ─────────────────────────
+            AdminRole operator = upsertRole("OPERATOR", "Manage routes and groups, read-only on security");
+            List<String> operatorPerms = List.of(
+                "ROUTE_READ", "ROUTE_WRITE", "GROUP_READ", "GROUP_WRITE",
+                "REGISTRY_READ", "HEALTH_READ", "SECURITY_READ"
             );
+            for (AdminPermission perm : allPerms) {
+                if (operatorPerms.contains(perm.getName())) {
+                    rolePermissionRepository
+                        .findByRoleIdAndPermissionId(operator.getId(), perm.getId())
+                        .switchIfEmpty(rolePermissionRepository.save(
+                            RolePermission.builder()
+                                .roleId(operator.getId())
+                                .permissionId(perm.getId())
+                                .build()))
+                        .block();
+                }
+            }
 
-            // ── Role: OPERATOR ────────────────────────────────────────────────
-            AdminRole operator = roleRepository.save(AdminRole.builder()
-                .name("OPERATOR").description("Manage routes and groups, read-only on security")
-                .createdAt(LocalDateTime.now()).createdBy("SYS")
-                .build()).block();
-
-            List.of("ROUTE_READ", "ROUTE_WRITE", "GROUP_READ", "GROUP_WRITE",
-                    "REGISTRY_READ", "HEALTH_READ", "SECURITY_READ").forEach(permName ->
-                savedPerms.stream()
-                    .filter(p -> p.getName().equals(permName))
-                    .findFirst()
-                    .ifPresent(p -> rolePermissionRepository.save(RolePermission.builder()
-                        .roleId(operator.getId()).permissionId(p.getId())
-                        .build()).block())
+            // ── 5. Upsert VIEWER role + permissions ───────────────────────────
+            AdminRole viewer = upsertRole("VIEWER", "Read-only access");
+            List<String> viewerPerms = List.of(
+                "ROUTE_READ", "GROUP_READ", "REGISTRY_READ", "HEALTH_READ", "SECURITY_READ"
             );
+            for (AdminPermission perm : allPerms) {
+                if (viewerPerms.contains(perm.getName())) {
+                    rolePermissionRepository
+                        .findByRoleIdAndPermissionId(viewer.getId(), perm.getId())
+                        .switchIfEmpty(rolePermissionRepository.save(
+                            RolePermission.builder()
+                                .roleId(viewer.getId())
+                                .permissionId(perm.getId())
+                                .build()))
+                        .block();
+                }
+            }
 
-            // ── Role: VIEWER ──────────────────────────────────────────────────
-            AdminRole viewer = roleRepository.save(AdminRole.builder()
-                .name("VIEWER").description("Read-only access")
-                .createdAt(LocalDateTime.now()).createdBy("SYS")
-                .build()).block();
+            // ── 6. Create default admin user (first boot only) ────────────────
+            Long userCount = userRepository.count().block();
+            if (userCount == null || userCount == 0) {
+                AdminUser admin = userRepository.save(AdminUser.builder()
+                    .username("admin")
+                    .passwordHash(BCrypt.hashpw("admin123", BCrypt.gensalt(12)))
+                    .fullName("Super Admin")
+                    .email("admin@localhost")
+                    .createdAt(LocalDateTime.now())
+                    .createdBy("SYS")
+                    .build()).block();
 
-            List.of("ROUTE_READ", "GROUP_READ", "REGISTRY_READ", "HEALTH_READ", "SECURITY_READ")
-                .forEach(permName ->
-                    savedPerms.stream()
-                        .filter(p -> p.getName().equals(permName))
-                        .findFirst()
-                        .ifPresent(p -> rolePermissionRepository.save(RolePermission.builder()
-                            .roleId(viewer.getId()).permissionId(p.getId())
-                            .build()).block())
-                );
+                userRoleRepository.save(
+                    UserRole.builder().userId(admin.getId()).roleId(superAdmin.getId()).build()
+                ).block();
 
-            // ── Default admin user ────────────────────────────────────────────
-            AdminUser admin = userRepository.save(AdminUser.builder()
-                .username("admin")
-                .passwordHash(BCrypt.hashpw("admin123", BCrypt.gensalt(12)))
-                .fullName("Super Admin")
-                .email("admin@localhost")
-                .createdAt(LocalDateTime.now()).createdBy("SYS")
-                .build()).block();
-
-            userRoleRepository.save(UserRole.builder()
-                .userId(admin.getId()).roleId(superAdmin.getId())
-                .build()).block();
-
-            log.info("Admin seeder complete — login with admin / admin123");
+                log.info("Admin seeder — created default user: admin / admin123");
+            } else {
+                log.info("Admin seeder — permissions/roles synced ({} permissions, users already exist)",
+                    allPerms.size());
+            }
 
         } catch (Exception e) {
             log.error("Admin seeder failed: {}", e.getMessage(), e);
         }
+    }
+
+    // ── helpers ───────────────────────────────────────────────────────────────
+
+    private AdminPermission upsertPermission(String name, String description) {
+        return permissionRepository.findActiveByName(name)
+            .switchIfEmpty(permissionRepository.save(AdminPermission.builder()
+                .name(name)
+                .description(description)
+                .createdAt(LocalDateTime.now())
+                .createdBy("SYS")
+                .build()))
+            .block();
+    }
+
+    private AdminRole upsertRole(String name, String description) {
+        return roleRepository.findActiveByName(name)
+            .switchIfEmpty(roleRepository.save(AdminRole.builder()
+                .name(name)
+                .description(description)
+                .createdAt(LocalDateTime.now())
+                .createdBy("SYS")
+                .build()))
+            .block();
     }
 }

@@ -13,4 +13,7 @@ public interface RolePermissionRepository extends R2dbcRepository<RolePermission
     @Modifying
     @Query("DELETE FROM public.role_permission WHERE role_id = :roleId")
     Mono<Integer> deleteByRoleId(Long roleId);
+
+    @Query("SELECT * FROM public.role_permission WHERE role_id = :roleId AND permission_id = :permissionId")
+    Mono<RolePermission> findByRoleIdAndPermissionId(Long roleId, Long permissionId);
 }
