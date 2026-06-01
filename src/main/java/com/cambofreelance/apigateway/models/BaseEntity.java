@@ -6,12 +6,16 @@ import java.io.Serializable;
 import java.time.LocalDateTime;
 import com.cambofreelance.apigateway.constants.Constants;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import lombok.experimental.SuperBuilder;
 
 @Getter
 @Setter
 @ToString
+@NoArgsConstructor
+@SuperBuilder(toBuilder = true)
 @MappedSuperclass
 public class BaseEntity implements Serializable {
 

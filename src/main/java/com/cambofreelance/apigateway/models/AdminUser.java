@@ -8,10 +8,11 @@ import org.springframework.data.relational.core.mapping.Table;
 
 import java.io.Serial;
 import java.io.Serializable;
+import java.time.LocalDateTime;
 
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @SuperBuilder(toBuilder = true)
-@Table("ip_access_control")
-public class IpAccessControl extends BaseEntity implements Serializable {
+@Table("admin_user")
+public class AdminUser extends BaseEntity implements Serializable {
 
     @Serial
     private static final long serialVersionUID = 1L;
@@ -19,15 +20,16 @@ public class IpAccessControl extends BaseEntity implements Serializable {
     @Id
     private Long id;
 
-    private String type;        // WHITELIST | BLACKLIST
+    private String username;
 
-    @Column("ip_cidr")
-    private String ipCidr;
+    @Column("password_hash")
+    private String passwordHash;
 
-    private String scope;       // GLOBAL | GROUP | ROUTE
+    private String email;
 
-    @Column("scope_id")
-    private String scopeId;
+    @Column("full_name")
+    private String fullName;
 
-    private String description;
+    @Column("last_login_at")
+    private LocalDateTime lastLoginAt;
 }

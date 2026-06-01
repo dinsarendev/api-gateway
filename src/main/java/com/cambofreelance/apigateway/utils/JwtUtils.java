@@ -4,12 +4,19 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.MalformedJwtException;
+import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.UnsupportedJwtException;
 import io.jsonwebtoken.security.Keys;
-import java.security.Key;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+
+import java.security.Key;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Component
@@ -21,18 +28,33 @@ public class JwtUtils {
     @Value("${authentication.jwtExpiration}")
     private int jwtExpirationMs;
 
+    @Value("${authentication.adminJwtExpiration:3600000}")
+    private int adminJwtExpirationMs;
+
     private Key getSigningKey() {
         return Keys.hmacShaKeyFor(jwtSecret.getBytes());
     }
 
+    // ── Token generation ──────────────────────────────────────────────────────
+
+    public String generateAdminToken(String username, List<String> roles) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("roles", roles);
+        claims.put("admin", true);
+        return Jwts.builder()
+            .setClaims(claims)
+            .setSubject(username)
+            .setIssuedAt(new Date())
+            .setExpiration(new Date(System.currentTimeMillis() + adminJwtExpirationMs))
+            .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+            .compact();
+    }
+
+    // ── Token reading ─────────────────────────────────────────────────────────
+
     public String getUserIdFromJwtToken(String token) {
         try {
-            Claims claims = Jwts.parserBuilder()
-                .setSigningKey(getSigningKey())
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
-            return claims.getSubject();
+            return parseClaims(token).getSubject();
         } catch (Throwable e) {
             log.error("Error while parsing JWT token: {}", e.getMessage());
             return "";
@@ -41,48 +63,46 @@ public class JwtUtils {
 
     public String getDataTokenAndKey(String token, String key) {
         try {
-            Claims claims = Jwts.parserBuilder()
-                .setSigningKey(getSigningKey())
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
-            return claims.get(key, String.class);
+            return parseClaims(token).get(key, String.class);
         } catch (Throwable e) {
             log.info("Error while parsing JWT token: {}", e.getMessage());
             return "";
         }
     }
 
-    @SuppressWarnings("unchecked")
-    public java.util.List<String> getRolesFromToken(String token) {
+    public boolean isAdminToken(String token) {
         try {
-            Object roles = Jwts.parserBuilder().setSigningKey(getSigningKey()).build()
-                .parseClaimsJws(token).getBody().get("roles");
-            if (roles instanceof java.util.List<?> list) return (java.util.List<String>) list;
-            if (roles instanceof String s && !s.isBlank())
-                return java.util.Arrays.asList(s.split(","));
-        } catch (Throwable ignored) {}
-        return java.util.List.of();
+            return Boolean.TRUE.equals(parseClaims(token).get("admin", Boolean.class));
+        } catch (Throwable e) {
+            return false;
+        }
     }
 
     @SuppressWarnings("unchecked")
-    public java.util.List<String> getPermissionsFromToken(String token) {
+    public List<String> getRolesFromToken(String token) {
         try {
-            Object perms = Jwts.parserBuilder().setSigningKey(getSigningKey()).build()
-                .parseClaimsJws(token).getBody().get("permissions");
-            if (perms instanceof java.util.List<?> list) return (java.util.List<String>) list;
-            if (perms instanceof String s && !s.isBlank())
-                return java.util.Arrays.asList(s.split(","));
+            Object roles = parseClaims(token).get("roles");
+            if (roles instanceof List<?> list) return (List<String>) list;
+            if (roles instanceof String s && !s.isBlank()) return Arrays.asList(s.split(","));
         } catch (Throwable ignored) {}
-        return java.util.List.of();
+        return List.of();
     }
+
+    @SuppressWarnings("unchecked")
+    public List<String> getPermissionsFromToken(String token) {
+        try {
+            Object perms = parseClaims(token).get("permissions");
+            if (perms instanceof List<?> list) return (List<String>) list;
+            if (perms instanceof String s && !s.isBlank()) return Arrays.asList(s.split(","));
+        } catch (Throwable ignored) {}
+        return List.of();
+    }
+
+    // ── Token validation ──────────────────────────────────────────────────────
 
     public boolean validateJwtToken(String authToken) {
         try {
-            Jwts.parserBuilder()
-                .setSigningKey(getSigningKey())
-                .build()
-                .parseClaimsJws(authToken);
+            Jwts.parserBuilder().setSigningKey(getSigningKey()).build().parseClaimsJws(authToken);
             return true;
         } catch (io.jsonwebtoken.security.SecurityException | MalformedJwtException e) {
             log.error("Invalid JWT signature: {}", e.getMessage());
@@ -94,5 +114,15 @@ public class JwtUtils {
             log.error("JWT claims string is empty: {}", e.getMessage());
         }
         return false;
+    }
+
+    // ── Private ───────────────────────────────────────────────────────────────
+
+    private Claims parseClaims(String token) {
+        return Jwts.parserBuilder()
+            .setSigningKey(getSigningKey())
+            .build()
+            .parseClaimsJws(token)
+            .getBody();
     }
 }

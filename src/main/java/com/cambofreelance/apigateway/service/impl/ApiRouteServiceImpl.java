@@ -15,7 +15,9 @@ import org.springframework.r2dbc.core.DatabaseClient;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
+import io.r2dbc.spi.Parameters;
 import java.time.LocalDateTime;
 
 @Slf4j
@@ -63,14 +65,14 @@ public class ApiRouteServiceImpl implements ApiRouteService {
             .bind("isPublic",             orEmpty(req.isPublic(), "N"))
             .bind("isEncrypt",            orEmpty(req.isEncrypt(), "N"))
             .bind("enableCircuitBreaker", orEmpty(req.enableCircuitBreaker(), "N"))
-            .bind("rateLimit",            req.rateLimit())
-            .bind("rateLimitDuration",    req.rateLimitDuration())
+            .bind("rateLimit",            req.rateLimit() != null ? req.rateLimit() : Parameters.in(Integer.class))
+            .bind("rateLimitDuration",    req.rateLimitDuration() != null ? req.rateLimitDuration() : Parameters.in(Integer.class))
             .bind("priority",             req.priority() != null ? req.priority() : 1)
-            .bind("startTime",            req.startTime())
-            .bind("endTime",              req.endTime())
+            .bind("startTime",            req.startTime() != null ? req.startTime() : Parameters.in(LocalDateTime.class))
+            .bind("endTime",              req.endTime() != null ? req.endTime() : Parameters.in(LocalDateTime.class))
             .bind("authType",             req.authType() != null ? req.authType() : "JWT")
-            .bind("requiredRoles",        req.requiredRoles())
-            .bind("requiredPermissions",  req.requiredPermissions())
+            .bind("requiredRoles",        req.requiredRoles() != null ? req.requiredRoles() : Parameters.in(String.class))
+            .bind("requiredPermissions",  req.requiredPermissions() != null ? req.requiredPermissions() : Parameters.in(String.class))
             .bind("createdBy",            ADMIN)
             .map(row -> row.get("id", Long.class))
             .first()
@@ -174,12 +176,14 @@ public class ApiRouteServiceImpl implements ApiRouteService {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private void refreshAll() {
-        try {
-            gatewayRouteService.refreshRoutes();
-            apiMigrateRegistry.loadComponent();
-        } catch (Exception e) {
-            log.error("Route refresh failed: {}", e.getMessage());
-        }
+        Mono.fromRunnable(() -> {
+            try {
+                gatewayRouteService.refreshRoutes();
+                apiMigrateRegistry.loadComponent();
+            } catch (Exception e) {
+                log.error("Route refresh failed: {}", e.getMessage());
+            }
+        }).subscribeOn(Schedulers.boundedElastic()).subscribe();
     }
 
     private RouteApiResponse toResponse(ApiRoute r) {

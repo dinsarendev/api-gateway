@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import { ToastProvider } from './context/ToastContext';
@@ -9,7 +10,8 @@ import RoutesPage      from './pages/Routes';
 import ApiKeys         from './pages/ApiKeys';
 import IpAccessControl from './pages/IpAccessControl';
 import OAuth2Providers from './pages/OAuth2Providers';
-import { API } from './api/gateway';
+import Login           from './pages/Login';
+import { auth } from './auth';
 
 const TITLES = {
   '/':                  'Dashboard',
@@ -22,13 +24,10 @@ const TITLES = {
   '/security/oauth2':   'OAuth2 Providers',
 };
 
-function Layout() {
+// eslint-disable-next-line no-unused-vars
+function Layout({ onLogout }) {
   const { pathname } = useLocation();
-
   const reload = () => window.location.reload();
-  const reloadGateway = async () => {
-    try { await API.reloadRoutes(); } catch { /* already handled in page */ }
-  };
 
   return (
     <div id="app">
@@ -36,9 +35,9 @@ function Layout() {
       <div id="main">
         <header id="topbar">
           <div className="topbar-title">{TITLES[pathname] || 'Admin'}</div>
-          <div style={{ display:'flex', alignItems:'center', gap:'.5rem' }}>
-            <span style={{ fontSize:'.75rem', background:'#dcfce7', color:'#166534', borderRadius:'999px', padding:'.2em .65em', fontWeight:600 }}>
-              <i className="fa-solid fa-circle-check" style={{marginRight:'.3rem'}} />Gateway Online
+          <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+            <span style={{ fontSize: '.75rem', background: '#dcfce7', color: '#166534', borderRadius: '999px', padding: '.2em .65em', fontWeight: 600 }}>
+              <i className="fa-solid fa-circle-check" style={{ marginRight: '.3rem' }} />Gateway Online
             </span>
             <button className="btn btn-secondary btn-sm" onClick={reload}>
               <i className="fa-solid fa-arrows-rotate" /> Refresh
@@ -47,9 +46,9 @@ function Layout() {
         </header>
         <div id="content">
           <Routes>
-            <Route path="/"         element={<Dashboard />} />
-            <Route path="/routes"   element={<RoutesPage />} />
-            <Route path="/groups"   element={<Groups />} />
+            <Route path="/"                  element={<Dashboard />} />
+            <Route path="/routes"            element={<RoutesPage />} />
+            <Route path="/groups"            element={<Groups />} />
             <Route path="/registry"          element={<Registry />} />
             <Route path="/health"            element={<Health />} />
             <Route path="/security/api-keys" element={<ApiKeys />} />
@@ -64,10 +63,17 @@ function Layout() {
 }
 
 export default function App() {
+  const [loggedIn, setLoggedIn] = useState(auth.isLoggedIn());
+
+  const handleLogin = () => setLoggedIn(true);
+
   return (
     <HashRouter>
       <ToastProvider>
-        <Layout />
+        {loggedIn
+          ? <Layout />
+          : <Login onLogin={handleLogin} />
+        }
       </ToastProvider>
     </HashRouter>
   );
