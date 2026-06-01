@@ -9,6 +9,7 @@ import com.cambofreelance.apigateway.constants.ErrorCode;
 import com.cambofreelance.apigateway.dto.ApiRouteDto;
 import com.cambofreelance.apigateway.exception.MessageResponse;
 import com.cambofreelance.apigateway.service.impl.RateLimiterService;
+import com.cambofreelance.apigateway.utils.JwtUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
@@ -34,15 +35,18 @@ public class RequestLoggingFilter implements GlobalFilter {
 
     private final RateLimiterService rateLimiterService;
     private final ApiRouteManagerRedisCache apiRouteManagerRedisCache;
+    private final JwtUtils jwtUtils;
     private final ObjectMapper objectMapper;
     private final Tracer tracer;
 
     public RequestLoggingFilter(RateLimiterService rateLimiterService,
                                 ApiRouteManagerRedisCache apiRouteManagerRedisCache,
+                                JwtUtils jwtUtils,
                                 ObjectMapper objectMapper,
                                 Tracer tracer) {
         this.rateLimiterService = rateLimiterService;
         this.apiRouteManagerRedisCache = apiRouteManagerRedisCache;
+        this.jwtUtils = jwtUtils;
         this.objectMapper = objectMapper;
         this.tracer = tracer;
     }
@@ -53,30 +57,35 @@ public class RequestLoggingFilter implements GlobalFilter {
         String path   = request.getPath().toString();
         String method = Optional.of(request.getMethod()).map(Object::toString).orElse(Constants.UNKNOWN);
 
+        // Pass CORS preflight through without any auth or rate-limit checks
         if (HttpMethod.OPTIONS.equals(request.getMethod())) {
             return chain.filter(exchange);
         }
 
-        String clientIp = resolveClientIp(request);
+        String clientIp      = resolveClientIp(request);
+        String correlationId = resolveCorrelationId(request);
 
-        log.info("Request: uri={}, method={}, ip={}", request.getURI(), method, clientIp);
+        log.info("Inbound: correlationId={}, method={}, path={}, ip={}", correlationId, method, path, clientIp);
+
+        // Echo correlation ID on every response so clients can trace their request
+        exchange.getResponse().getHeaders().set(Constants.CORRELATION_ID, correlationId);
 
         // Resolve route — Redis first, in-memory fallback
-        ApiRouteDto apiRouteDto = safeGetApiRouteFromRedis(path, method);
-        if (apiRouteDto == null) {
-            apiRouteDto = ApiRouteManagerCache.get(path, method);
+        ApiRouteDto routeDto = safeGetApiRouteFromRedis(path, method);
+        if (routeDto == null) {
+            routeDto = ApiRouteManagerCache.get(path, method);
         }
-
-        if (apiRouteDto == null) {
+        if (routeDto == null) {
             return errorResponse(exchange, HttpStatus.NOT_FOUND, ErrorCode.ERR_00404, "API route not found");
         }
 
-        // Public routes — skip auth header check
-        if (Constants.YES.equalsIgnoreCase(apiRouteDto.getIsPublic())) {
-            return applyRateLimitOrContinue(exchange, chain, method, clientIp, apiRouteDto);
+        // ── Public routes ──────────────────────────────────────────────────────────
+        if (Constants.YES.equalsIgnoreCase(routeDto.getIsPublic())) {
+            ServerWebExchange publicExchange = withUpstreamHeaders(exchange, request, clientIp, correlationId, null);
+            return applyRateLimitOrContinue(publicExchange, chain, method, clientIp, routeDto);
         }
 
-        // Private routes — require Bearer token
+        // ── Private routes — require a valid Bearer JWT ────────────────────────────
         String authHeader = request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
         if (StringUtils.isBlank(authHeader)) {
             return errorResponse(exchange, HttpStatus.UNAUTHORIZED, ErrorCode.ERR_00401, "Missing Authorization header");
@@ -85,15 +94,38 @@ public class RequestLoggingFilter implements GlobalFilter {
             return errorResponse(exchange, HttpStatus.UNAUTHORIZED, ErrorCode.ERR_00401, "Invalid Authorization header format");
         }
 
-        ServerWebExchange mutatedExchange = exchange.mutate()
-            .request(request.mutate().header(Constants.IP, clientIp).build())
-            .build();
+        String token = authHeader.substring(Constants.BEARER.length());
+        if (!jwtUtils.validateJwtToken(token)) {
+            return errorResponse(exchange, HttpStatus.UNAUTHORIZED, ErrorCode.ERR_00401, "Invalid or expired token");
+        }
 
-        return applyRateLimitOrContinue(mutatedExchange, chain, method, clientIp, apiRouteDto);
+        String userId = jwtUtils.getUserIdFromJwtToken(token);
+        ServerWebExchange privateExchange = withUpstreamHeaders(exchange, request, clientIp, correlationId, userId);
+        return applyRateLimitOrContinue(privateExchange, chain, method, clientIp, routeDto);
+    }
+
+    /**
+     * Mutates the exchange request to inject headers forwarded to upstream services.
+     * userId is null for public routes (no JWT).
+     */
+    private ServerWebExchange withUpstreamHeaders(ServerWebExchange exchange,
+                                                   ServerHttpRequest request,
+                                                   String clientIp,
+                                                   String correlationId,
+                                                   String userId) {
+        ServerHttpRequest.Builder builder = request.mutate()
+            .header(Constants.IP, clientIp)
+            .header(Constants.CORRELATION_ID, correlationId);
+
+        if (StringUtils.isNotBlank(userId)) {
+            builder.header(Constants.USER_ID, userId);
+        }
+
+        return exchange.mutate().request(builder.build()).build();
     }
 
     private Mono<Void> applyRateLimitOrContinue(ServerWebExchange exchange, GatewayFilterChain chain,
-                                                String method, String clientIp, ApiRouteDto routeConfig) {
+                                                 String method, String clientIp, ApiRouteDto routeConfig) {
         return rateLimiterService.isAllowed(method, clientIp, routeConfig)
             .flatMap(allowed -> {
                 if (Boolean.FALSE.equals(allowed)) {
@@ -104,6 +136,8 @@ public class RequestLoggingFilter implements GlobalFilter {
             });
     }
 
+    // ── Helpers ────────────────────────────────────────────────────────────────────
+
     private String resolveClientIp(ServerHttpRequest request) {
         String forwarded = request.getHeaders().getFirst(Constants.X_FORWARDED_FOR);
         if (StringUtils.isNotBlank(forwarded)) {
@@ -112,6 +146,12 @@ public class RequestLoggingFilter implements GlobalFilter {
         return Optional.ofNullable(request.getRemoteAddress())
             .map(addr -> addr.getAddress().getHostAddress())
             .orElse(Constants.UNKNOWN);
+    }
+
+    /** Uses the client's correlation ID if present, otherwise generates one. */
+    private String resolveCorrelationId(ServerHttpRequest request) {
+        String existing = request.getHeaders().getFirst(Constants.CORRELATION_ID);
+        return StringUtils.isNotBlank(existing) ? existing : UUID.randomUUID().toString();
     }
 
     private ApiRouteDto safeGetApiRouteFromRedis(String path, String method) {
