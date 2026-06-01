@@ -8,6 +8,8 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Table;
 
 @Getter
 @Setter
@@ -15,13 +17,15 @@ import lombok.Setter;
 @AllArgsConstructor
 @Builder
 @EqualsAndHashCode(callSuper = false)
+@Table("api_group_route")
 public class ApiGroupRoute extends BaseEntity implements Serializable {
 
     @Serial
     private static final long serialVersionUID = 7013891582242164719L;
+
+    @Id
     private Long id;
     private String code;
     private String uri;
     private String status;
-
 }
