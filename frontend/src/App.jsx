@@ -10,6 +10,8 @@ import RoutesPage      from './pages/Routes';
 import ApiKeys         from './pages/ApiKeys';
 import IpAccessControl from './pages/IpAccessControl';
 import OAuth2Providers from './pages/OAuth2Providers';
+import Users           from './pages/Users';
+import Roles           from './pages/Roles';
 import Login           from './pages/Login';
 import { auth } from './auth';
 
@@ -22,6 +24,8 @@ const TITLES = {
   '/security/api-keys': 'API Key Management',
   '/security/ip-acl':   'IP Access Control',
   '/security/oauth2':   'OAuth2 Providers',
+  '/users':             'User Management',
+  '/roles':             'Role Management',
 };
 
 // eslint-disable-next-line no-unused-vars
@@ -54,6 +58,8 @@ function Layout({ onLogout }) {
             <Route path="/security/api-keys" element={<ApiKeys />} />
             <Route path="/security/ip-acl"   element={<IpAccessControl />} />
             <Route path="/security/oauth2"   element={<OAuth2Providers />} />
+            <Route path="/users"             element={<Users />} />
+            <Route path="/roles"             element={<Roles />} />
             <Route path="*"                  element={<Navigate to="/" replace />} />
           </Routes>
         </div>

@@ -71,6 +71,10 @@ export default function Sidebar() {
       <NavItem to="/security/ip-acl"   icon="fa-shield-halved" label="IP Access Control" />
       <NavItem to="/security/oauth2"   icon="fa-id-badge"      label="OAuth2 Providers" />
 
+      <div className="sidebar-section">ADMINISTRATION</div>
+      <NavItem to="/users" icon="fa-users"       label="Users" />
+      <NavItem to="/roles" icon="fa-user-shield" label="Roles" />
+
       {/* Logout — pinned to bottom */}
       <div style={{ marginTop: 'auto', padding: '1rem 1.2rem', borderTop: '1px solid #1e293b' }}>
         <button

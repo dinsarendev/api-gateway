@@ -75,4 +75,24 @@ export const API = {
   createOAuth2Provider: (data)     => post('/admin/oauth2-providers', data),
   updateOAuth2Provider: (id, data) => put(`/admin/oauth2-providers/${id}`, data),
   deleteOAuth2Provider: (id)       => del(`/admin/oauth2-providers/${id}`),
+
+  // ── Roles ─────────────────────────────────────────────────────────────────
+  getRoles:       (params = {}) => {
+    const q = new URLSearchParams({ status: 'ACT', search: '', page: 0, size: 15, ...params }).toString();
+    return get(`/admin/roles?${q}`);
+  },
+  getPermissions: ()             => get('/admin/roles/permissions'),
+  createRole:     (data)         => post('/admin/roles', data),
+  updateRole:     (id, data)     => put(`/admin/roles/${id}`, data),
+  updateRoleStatus:(id, status)  => put(`/admin/roles/${id}/status`, { status }),
+
+  // ── Users ─────────────────────────────────────────────────────────────────
+  getUsers:       (params = {}) => {
+    const q = new URLSearchParams({ status: 'ACT', search: '', page: 0, size: 15, ...params }).toString();
+    return get(`/admin/users?${q}`);
+  },
+  createUser:     (data)     => post('/admin/users', data),
+  updateUser:     (id, data) => put(`/admin/users/${id}`, data),
+  updateUserStatus:(id, status) => put(`/admin/users/${id}/status`, { status }),
+  deleteUser:     (id)       => del(`/admin/users/${id}`),
 };

@@ -22,4 +22,27 @@ public interface AdminUserRepository extends R2dbcRepository<AdminUser, Long> {
     @Modifying
     @Query("UPDATE public.admin_user SET last_login_at = :now WHERE id = :id")
     Mono<Integer> touchLastLogin(Long id, LocalDateTime now);
+
+    @Query("""
+        SELECT COUNT(*) FROM public.admin_user
+        WHERE (:status IS NULL OR status = :status)
+          AND (:search IS NULL OR username ILIKE :search OR email ILIKE :search OR full_name ILIKE :search)
+        """)
+    Mono<Long> countByFilter(String status, String search);
+
+    @Query("""
+        SELECT * FROM public.admin_user
+        WHERE (:status IS NULL OR status = :status)
+          AND (:search IS NULL OR username ILIKE :search OR email ILIKE :search OR full_name ILIKE :search)
+        ORDER BY id DESC
+        LIMIT :size OFFSET :offset
+        """)
+    Flux<AdminUser> findByFilter(String status, String search, int size, long offset);
+
+    @Query("SELECT * FROM public.admin_user WHERE username = :username")
+    Mono<AdminUser> findByUsername(String username);
+
+    @Modifying
+    @Query("UPDATE public.admin_user SET status = :status, updated_at = :now, updated_by = :updatedBy WHERE id = :id")
+    Mono<Integer> updateStatus(Long id, String status, LocalDateTime now, String updatedBy);
 }
