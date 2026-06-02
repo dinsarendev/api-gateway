@@ -59,7 +59,10 @@ CREATE TABLE public.api_route (
 ALTER TABLE public.api_route
     ADD COLUMN IF NOT EXISTS auth_type varchar(20) DEFAULT 'JWT',
     ADD COLUMN IF NOT EXISTS required_roles text NULL,
-    ADD COLUMN IF NOT EXISTS required_permissions text NULL;
+    ADD COLUMN IF NOT EXISTS required_permissions text NULL,
+    ADD COLUMN IF NOT EXISTS api_type varchar(20) DEFAULT 'REST' NULL;
+
+COMMENT ON COLUMN public.api_route.api_type IS 'REST | SOAP | GRAPHQL | STREAMING | AI';
 
 -- ── Security tables ────────────────────────────────────────────────────────
 

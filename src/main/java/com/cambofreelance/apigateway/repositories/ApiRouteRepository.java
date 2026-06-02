@@ -62,6 +62,7 @@ public interface ApiRouteRepository extends R2dbcRepository<ApiRoute, Long> {
                auth_type              = :authType,
                required_roles         = :requiredRoles,
                required_permissions   = :requiredPermissions,
+               api_type               = :apiType,
                updated_at             = :updatedAt,
                updated_by             = :updatedBy
          WHERE id = :id
@@ -73,6 +74,7 @@ public interface ApiRouteRepository extends R2dbcRepository<ApiRoute, Long> {
                               Integer rateLimit, Integer rateLimitDuration,
                               Integer priority, LocalDateTime startTime, LocalDateTime endTime,
                               String authType, String requiredRoles, String requiredPermissions,
+                              String apiType,
                               LocalDateTime updatedAt, String updatedBy);
 
     @Modifying

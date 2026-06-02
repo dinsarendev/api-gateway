@@ -20,6 +20,7 @@ public record RouteApiRequest(
     @JsonProperty("end_time")              LocalDateTime endTime,
     @JsonProperty("auth_type")             String authType,
     @JsonProperty("required_roles")        String requiredRoles,
-    @JsonProperty("required_permissions")  String requiredPermissions
+    @JsonProperty("required_permissions")  String requiredPermissions,
+    @JsonProperty("api_type")              String apiType
 ) {}
 

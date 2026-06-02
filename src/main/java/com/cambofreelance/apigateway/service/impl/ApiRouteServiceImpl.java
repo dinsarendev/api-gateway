@@ -47,14 +47,14 @@ public class ApiRouteServiceImpl implements ApiRouteService {
                      rate_limit, rate_limit_duration, priority,
                      start_time, end_time,
                      auth_type, required_roles, required_permissions,
-                     status, created_at, created_by)
+                     api_type, status, created_at, created_by)
                 VALUES
                     (:groupCode, :path, :method, :description, :applicationId,
                      :isPublic, :isEncrypt, :enableCircuitBreaker,
                      :rateLimit, :rateLimitDuration, :priority,
                      :startTime, :endTime,
                      :authType, :requiredRoles, :requiredPermissions,
-                     'ACT', NOW(), :createdBy)
+                     :apiType, 'ACT', NOW(), :createdBy)
                 RETURNING id
                 """)
             .bind("groupCode",            orEmpty(req.groupCode()))
@@ -73,6 +73,7 @@ public class ApiRouteServiceImpl implements ApiRouteService {
             .bind("authType",             req.authType() != null ? req.authType() : "JWT")
             .bind("requiredRoles",        req.requiredRoles() != null ? req.requiredRoles() : Parameters.in(String.class))
             .bind("requiredPermissions",  req.requiredPermissions() != null ? req.requiredPermissions() : Parameters.in(String.class))
+            .bind("apiType",              req.apiType() != null ? req.apiType().toUpperCase() : Constants.API_TYPE_REST)
             .bind("createdBy",            ADMIN)
             .map(row -> row.get("id", Long.class))
             .first()
@@ -109,6 +110,7 @@ public class ApiRouteServiceImpl implements ApiRouteService {
                 req.authType()             != null ? req.authType()             : existing.getAuthType(),
                 req.requiredRoles()        != null ? req.requiredRoles()        : existing.getRequiredRoles(),
                 req.requiredPermissions()  != null ? req.requiredPermissions()  : existing.getRequiredPermissions(),
+                req.apiType()              != null ? req.apiType().toUpperCase() : existing.getApiType(),
                 LocalDateTime.now(), ADMIN
             ))
             .filter(rows -> rows > 0)
@@ -195,7 +197,8 @@ public class ApiRouteServiceImpl implements ApiRouteService {
             r.getStartTime(), r.getEndTime(),
             r.getStatus(), r.getCreatedBy(), r.getCreatedAt(),
             r.getUpdatedBy(), r.getUpdatedAt(),
-            r.getAuthType(), r.getRequiredRoles(), r.getRequiredPermissions()
+            r.getAuthType(), r.getRequiredRoles(), r.getRequiredPermissions(),
+            r.getApiType()
         );
     }
 

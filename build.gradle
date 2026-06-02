@@ -91,14 +91,18 @@ tasks.named('test') {
 // ── Frontend (React + Vite) ─────────────────────────────────────────────────
 def frontendDir = "$projectDir/frontend"
 def isWindows   = org.gradle.internal.os.OperatingSystem.current().isWindows()
-def npmCmd      = isWindows ? 'npm.cmd' : 'npm'
 
 task npmInstall(type: Exec) {
     description = 'Install frontend dependencies'
     workingDir  frontendDir
     inputs.file  "$frontendDir/package.json"
     outputs.dir  "$frontendDir/node_modules"
-    commandLine  npmCmd, 'install', '--prefer-offline'
+    // Use a login shell on Unix so nvm/Homebrew npm is on PATH in the Gradle daemon
+    if (isWindows) {
+        commandLine 'cmd', '/c', 'npm', 'install', '--prefer-offline'
+    } else {
+        commandLine 'bash', '-lc', 'npm install --prefer-offline'
+    }
 }
 
 task npmBuild(type: Exec, dependsOn: npmInstall) {
@@ -107,7 +111,11 @@ task npmBuild(type: Exec, dependsOn: npmInstall) {
     inputs.dir  "$frontendDir/src"
     inputs.file "$frontendDir/vite.config.js"
     outputs.dir "$projectDir/src/main/resources/static"
-    commandLine  npmCmd, 'run', 'build'
+    if (isWindows) {
+        commandLine 'cmd', '/c', 'npm', 'run', 'build'
+    } else {
+        commandLine 'bash', '-lc', 'npm run build'
+    }
 }
 
 processResources.dependsOn npmBuild

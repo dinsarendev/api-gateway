@@ -12,7 +12,16 @@ const EMPTY_FORM = {
   is_public: 'N', is_encrypt: 'N', enable_circuit_breaker: 'Y',
   priority: 1, rate_limit: '', rate_limit_duration: '',
   auth_type: 'JWT', required_roles: '', required_permissions: '',
+  api_type: 'REST',
 };
+
+const API_TYPES = [
+  { value: 'REST',      label: 'REST',      icon: 'fa-network-wired',  color: '#3b82f6' },
+  { value: 'SOAP',      label: 'SOAP',      icon: 'fa-code',           color: '#8b5cf6' },
+  { value: 'GRAPHQL',   label: 'GraphQL',   icon: 'fa-diagram-project', color: '#e11d48' },
+  { value: 'STREAMING', label: 'Streaming', icon: 'fa-wave-square',    color: '#0891b2' },
+  { value: 'AI',        label: 'AI',        icon: 'fa-robot',          color: '#059669' },
+];
 
 // ── small helpers ──────────────────────────────────────────────────────────
 const truncUri = uri => {
@@ -77,10 +86,11 @@ export default function Routes() {
   const [groups,  setGroups]  = useState([]);
 
   // filters — pre-seed groupFilter from ?group= param
-  const [status,       setStatus]       = useState('ACT');
-  const [methodFilter, setMethodFilter] = useState('');
-  const [groupFilter,  setGroupFilter]  = useState(() => searchParams.get('group') || '');
-  const [search,       setSearch]       = useState('');
+  const [status,          setStatus]          = useState('ACT');
+  const [methodFilter,    setMethodFilter]    = useState('');
+  const [groupFilter,     setGroupFilter]     = useState(() => searchParams.get('group') || '');
+  const [apiTypeFilter,   setApiTypeFilter]   = useState('');
+  const [search,          setSearch]          = useState('');
 
   // pagination
   const [page, setPage] = useState(0);
@@ -112,7 +122,7 @@ export default function Routes() {
   useEffect(() => { loadRoutes(); }, [loadRoutes]);
 
   // Reset to page 0 whenever any filter changes
-  useEffect(() => { setPage(0); }, [methodFilter, groupFilter, search, status]);
+  useEffect(() => { setPage(0); }, [methodFilter, groupFilter, apiTypeFilter, search, status]);
 
   // ── Group lookup map ──────────────────────────────────────────────────────
   const groupMap = useMemo(
@@ -123,11 +133,12 @@ export default function Routes() {
   // ── Filter + paginate ─────────────────────────────────────────────────────
   const filtered = useMemo(() =>
     routes.filter(r =>
-      (!methodFilter || r.method     === methodFilter) &&
-      (!groupFilter  || r.group_code === groupFilter) &&
-      (!search       || r.path?.toLowerCase().includes(search.toLowerCase()))
+      (!methodFilter   || r.method     === methodFilter) &&
+      (!groupFilter    || r.group_code === groupFilter) &&
+      (!apiTypeFilter  || (r.api_type || 'REST') === apiTypeFilter) &&
+      (!search         || r.path?.toLowerCase().includes(search.toLowerCase()))
     ),
-    [routes, methodFilter, groupFilter, search]
+    [routes, methodFilter, groupFilter, apiTypeFilter, search]
   );
 
   const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
@@ -148,6 +159,7 @@ export default function Routes() {
     auth_type:              r.auth_type              || 'JWT',
     required_roles:         r.required_roles         || '',
     required_permissions:   r.required_permissions   || '',
+    api_type:               r.api_type               || 'REST',
   });
 
   const openCreate = () => {
@@ -248,6 +260,13 @@ export default function Routes() {
           {['GET', 'POST', 'PUT', 'DELETE', 'PATCH'].map(m => <option key={m}>{m}</option>)}
         </select>
 
+        {/* API Type filter */}
+        <select className="form-select" style={{ width: 'auto' }} value={apiTypeFilter}
+          onChange={e => setApiTypeFilter(e.target.value)}>
+          <option value="">All Types</option>
+          {API_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+        </select>
+
         {/* Group filter */}
         <select className="form-select" style={{ width: 'auto' }} value={groupFilter}
           onChange={e => setGroupFilter(e.target.value)}>
@@ -285,6 +304,7 @@ export default function Routes() {
                     <th>ID</th>
                     <th>Path</th>
                     <th>Method</th>
+                    <th>Type</th>
                     <th>Group / Target</th>
                     <th>Public</th>
                     <th>Rate Limit</th>
@@ -294,7 +314,7 @@ export default function Routes() {
                 </thead>
                 <tbody>
                   {paged.length === 0
-                    ? <tr><td colSpan={8}><div className="empty-state"><i className="fa-solid fa-inbox" />No routes found</div></td></tr>
+                    ? <tr><td colSpan={9}><div className="empty-state"><i className="fa-solid fa-inbox" />No routes found</div></td></tr>
                     : paged.map(r => {
                       const grp = groupMap[r.group_code];
                       return (
@@ -302,6 +322,19 @@ export default function Routes() {
                           <td className="text-muted text-sm">#{r.id}</td>
                           <td><div className="path-cell" title={r.path}>{r.path}</div></td>
                           <td><span className={`method-badge method-${r.method}`}>{r.method}</span></td>
+                          <td>
+                            {(() => {
+                              const t = API_TYPES.find(t => t.value === (r.api_type || 'REST'));
+                              return t ? (
+                                <span style={{ fontSize: '.72rem', fontWeight: 600, color: t.color,
+                                  background: t.color + '18', padding: '2px 7px', borderRadius: 4,
+                                  whiteSpace: 'nowrap' }}>
+                                  <i className={`fa-solid ${t.icon}`} style={{ marginRight: '.3rem' }} />
+                                  {t.label}
+                                </span>
+                              ) : null;
+                            })()}
+                          </td>
                           <td>
                             <span className="fw-bold" style={{ color: '#1d4ed8', fontSize: '.82rem' }}>
                               {r.group_code || '—'}
@@ -368,7 +401,7 @@ export default function Routes() {
           </>
         }
       >
-        {/* Row 1: Group + Path + Method */}
+        {/* Row 1: Group + Path + API Type + Method */}
         <div className="form-row">
           <div className="form-group">
             <label className="form-label">Group Code <span className="text-required">*</span></label>
@@ -383,7 +416,6 @@ export default function Routes() {
                   {g.code} — {truncUri(g.uri)}
                 </option>
               ))}
-              {/* Keep orphaned group code visible if not in active groups list */}
               {form.group_code && !groupMap[form.group_code] && (
                 <option value={form.group_code}>{form.group_code} (not in active groups)</option>
               )}
@@ -407,10 +439,33 @@ export default function Routes() {
           </div>
 
           <div className="form-group">
+            <label className="form-label">API Type</label>
+            <select className="form-select" value={form.api_type}
+              onChange={e => f('api_type', e.target.value)}>
+              {API_TYPES.map(t => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
+            {form.api_type === 'GRAPHQL' && (
+              <div className="form-hint"><i className="fa-solid fa-circle-info" style={{ marginRight: '.3rem' }} />GET &amp; POST auto-allowed</div>
+            )}
+            {(form.api_type === 'STREAMING' || form.api_type === 'AI') && (
+              <div className="form-hint"><i className="fa-solid fa-circle-info" style={{ marginRight: '.3rem' }} />SSE — 30 min timeout, no buffering</div>
+            )}
+            {form.api_type === 'SOAP' && (
+              <div className="form-hint"><i className="fa-solid fa-circle-info" style={{ marginRight: '.3rem' }} />Injects Content-Type: text/xml</div>
+            )}
+          </div>
+
+          <div className="form-group">
             <label className="form-label">Method <span className="text-required">*</span></label>
-            <select className="form-select" value={form.method} onChange={e => f('method', e.target.value)}>
+            <select className="form-select" value={form.method} onChange={e => f('method', e.target.value)}
+              disabled={form.api_type === 'GRAPHQL'}>
               {['GET', 'POST', 'PUT', 'DELETE', 'PATCH'].map(m => <option key={m}>{m}</option>)}
             </select>
+            {form.api_type === 'GRAPHQL' && (
+              <div className="form-hint">Not required for GraphQL</div>
+            )}
           </div>
         </div>
 

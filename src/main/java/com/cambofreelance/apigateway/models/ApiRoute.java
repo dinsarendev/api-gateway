@@ -81,4 +81,7 @@ public class ApiRoute extends BaseEntity implements Serializable {
 
     @Column("required_permissions")
     private String requiredPermissions;
+
+    @Column("api_type")
+    private String apiType;
 }

@@ -35,6 +35,7 @@ public class ApiRouteDto implements Serializable {
     private String authType;
     private String requiredRoles;
     private String requiredPermissions;
+    private String apiType;
 
     public void setData(ApiRoute data) {
         this.id = data.getId();
@@ -56,5 +57,6 @@ public class ApiRouteDto implements Serializable {
         this.authType = data.getAuthType();
         this.requiredRoles = data.getRequiredRoles();
         this.requiredPermissions = data.getRequiredPermissions();
+        this.apiType = data.getApiType();
     }
 }
