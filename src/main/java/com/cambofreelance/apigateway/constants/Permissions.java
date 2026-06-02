@@ -31,4 +31,8 @@ public final class Permissions {
 
     // ── Monitoring ────────────────────────────────────────────────────────────
     public static final String MONITORING_READ = "MONITORING_READ";
+
+    // ── Incidents ─────────────────────────────────────────────────────────────
+    public static final String INCIDENT_READ  = "INCIDENT_READ";
+    public static final String INCIDENT_WRITE = "INCIDENT_WRITE";
 }

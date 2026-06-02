@@ -39,6 +39,10 @@ public class MetricsCollector {
             } else if (status >= 400) {
                 incr("gw:err:" + mm, TTL_MIN);
             }
+            // Fine-grained status counters for incident detection
+            if (status >= 500)       incr("gw:5xx:" + mm, TTL_MIN);
+            if (status == 401)       incr("gw:401:" + mm, TTL_MIN);
+            if (status == 504)       incr("gw:504:" + mm, TTL_MIN);
             // Keep up to 1000 latency samples per minute for P95/P99
             lpush("gw:lat:" + mm, String.valueOf(latencyMs), TTL_MIN);
 

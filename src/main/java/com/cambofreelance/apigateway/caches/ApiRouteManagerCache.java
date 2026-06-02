@@ -88,6 +88,25 @@ public class ApiRouteManagerCache {
         return null;
     }
 
+    // ================= BULK READ =================
+
+    /** Returns every cached route across all three buckets. */
+    public static List<ApiRouteDto> getAllRoutes() {
+        List<ApiRouteDto> all = new ArrayList<>();
+        if (exactMap != null)        all.addAll(exactMap.values());
+        if (pathVariableList != null) all.addAll(pathVariableList);
+        if (wildcardList != null)     all.addAll(wildcardList);
+        return all;
+    }
+
+    /** Returns all routes whose groupCode matches (case-insensitive). */
+    public static List<ApiRouteDto> getByGroupCode(String groupCode) {
+        if (groupCode == null) return Collections.emptyList();
+        return getAllRoutes().stream()
+            .filter(r -> groupCode.equalsIgnoreCase(r.getGroupCode()))
+            .toList();
+    }
+
     // ================= GENERAL CACHE =================
     public static String getGeneral(String key) {
         return generalCaches.get(key);

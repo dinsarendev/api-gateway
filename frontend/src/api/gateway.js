@@ -86,6 +86,15 @@ export const API = {
   updateOAuth2Provider: (id, data) => put(`/admin/oauth2-providers/${id}`, data),
   deleteOAuth2Provider: (id)       => del(`/admin/oauth2-providers/${id}`),
 
+  // ── Incidents ─────────────────────────────────────────────────────────────
+  getIncidentDashboard: ()           => get('/admin/incidents/dashboard'),
+  getIncidents:         (status = 'ALL') => get(`/admin/incidents?status=${status}`),
+  getIncident:          (id)         => get(`/admin/incidents/${id}`),
+  createIncident:       (data)       => post('/admin/incidents', data),
+  updateIncident:       (id, data)   => put(`/admin/incidents/${id}`, data),
+  resolveIncident:      (id)         => post(`/admin/incidents/${id}/resolve`),
+  closeIncident:        (id)         => del(`/admin/incidents/${id}`),
+
   // ── Monitoring ────────────────────────────────────────────────────────────
   getGatewayMetrics:  (window = 60) => get(`/admin/metrics/gateway?window=${window}`),
   getApiMetrics:      (window = 1, limit = 10) => get(`/admin/metrics/apis?window=${window}&limit=${limit}`),

@@ -19,6 +19,8 @@ export const PERMS = {
   ROLE_READ:     'ROLE_READ',
   ROLE_WRITE:    'ROLE_WRITE',
   MONITORING_READ: 'MONITORING_READ',
+  INCIDENT_READ:   'INCIDENT_READ',
+  INCIDENT_WRITE:  'INCIDENT_WRITE',
 };
 
 export function AuthProvider({ children }) {

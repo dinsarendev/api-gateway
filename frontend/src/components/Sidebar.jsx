@@ -87,11 +87,14 @@ export default function Sidebar({ isOpen, onClose }) {
         <NavItem to="/groups" icon="fa-layer-group" label="Service Groups" onClick={onClose} />
       )}
 
+      {(can(PERMS.INCIDENT_READ) || can(PERMS.MONITORING_READ)) && (
+        <div className="sidebar-section">MONITORING</div>
+      )}
+      {can(PERMS.INCIDENT_READ) && (
+        <NavItem to="/incidents" icon="fa-circle-exclamation" label="Incidents" onClick={onClose} />
+      )}
       {can(PERMS.MONITORING_READ) && (
-        <>
-          <div className="sidebar-section">MONITORING</div>
-          <NavItem to="/monitoring" icon="fa-chart-line" label="Monitoring" onClick={onClose} />
-        </>
+        <NavItem to="/monitoring" icon="fa-chart-line" label="Monitoring" onClick={onClose} />
       )}
 
       {(can(PERMS.REGISTRY_READ) || can(PERMS.HEALTH_READ)) && (

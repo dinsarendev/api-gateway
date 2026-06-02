@@ -21,7 +21,10 @@ VALUES
     ('USER_READ',       'View admin users',                                      'ACT', NOW(), 'SYS'),
     ('USER_WRITE',      'Create / update / delete admin users',                  'ACT', NOW(), 'SYS'),
     ('ROLE_READ',       'View roles and permissions',                            'ACT', NOW(), 'SYS'),
-    ('ROLE_WRITE',      'Create / update / delete roles and assign permissions', 'ACT', NOW(), 'SYS')
+    ('ROLE_WRITE',      'Create / update / delete roles and assign permissions', 'ACT', NOW(), 'SYS'),
+    ('MONITORING_READ', 'View live gateway metrics and monitoring dashboard',     'ACT', NOW(), 'SYS'),
+    ('INCIDENT_READ',   'View incidents and incident dashboard',                  'ACT', NOW(), 'SYS'),
+    ('INCIDENT_WRITE',  'Create, update, resolve and close incidents',            'ACT', NOW(), 'SYS')
 ON CONFLICT (name) DO NOTHING;
 
 -- ── 2. Upsert roles ──────────────────────────────────────────
@@ -47,12 +50,14 @@ SELECT r.id, p.id
 FROM   public.admin_role r
        JOIN public.admin_permission p
          ON p.name IN (
-             'ROUTE_READ', 'ROUTE_WRITE',
-             'GROUP_READ', 'GROUP_WRITE',
+             'ROUTE_READ',     'ROUTE_WRITE',
+             'GROUP_READ',     'GROUP_WRITE',
              'REGISTRY_READ',
              'HEALTH_READ',
              'SECURITY_READ',
-             'ROLE_READ'
+             'ROLE_READ',
+             'MONITORING_READ',
+             'INCIDENT_READ',  'INCIDENT_WRITE'
          )
 WHERE  r.name = 'OPERATOR'
   AND  p.status = 'ACT'
@@ -70,7 +75,9 @@ FROM   public.admin_role r
              'HEALTH_READ',
              'SECURITY_READ',
              'ROLE_READ',
-             'USER_READ'
+             'USER_READ',
+             'MONITORING_READ',
+             'INCIDENT_READ'
          )
 WHERE  r.name = 'VIEWER'
   AND  p.status = 'ACT'

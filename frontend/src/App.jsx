@@ -15,6 +15,7 @@ import IpAccessControl from './pages/IpAccessControl';
 import OAuth2Providers from './pages/OAuth2Providers';
 import Users           from './pages/Users';
 import Roles           from './pages/Roles';
+import Incidents       from './pages/Incidents';
 import Monitoring      from './pages/Monitoring';
 import Profile         from './pages/Profile';
 import Login           from './pages/Login';
@@ -26,6 +27,7 @@ const TITLES = {
   '/groups':            'Service Groups',
   '/registry':          'Service Registry',
   '/health':            'Health Monitor',
+  '/incidents':         'Incidents',
   '/monitoring':        'Monitoring',
   '/security/api-keys': 'API Key Management',
   '/security/ip-acl':   'IP Access Control',
@@ -93,6 +95,7 @@ function Layout({ sidebarOpen, setSidebarOpen }) {
             <Route path="/groups"            element={<Groups />} />
             <Route path="/registry"          element={<Registry />} />
             <Route path="/health"            element={<Health />} />
+            <Route path="/incidents"          element={<Incidents />} />
             <Route path="/monitoring"         element={<Monitoring />} />
             <Route path="/security/api-keys" element={<ApiKeys />} />
             <Route path="/security/ip-acl"   element={<IpAccessControl />} />

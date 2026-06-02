@@ -16,6 +16,9 @@ public interface ServiceNodeRepository extends R2dbcRepository<ServiceNode, Long
     /** All records that haven't been soft-deleted (status = 'ACT'). */
     Flux<ServiceNode> findAllByStatus(String status);
 
+    /** Active instances filtered by runtime health state — used by incident detection. */
+    Flux<ServiceNode> findAllByHealthStatusAndStatus(String healthStatus, String status);
+
     /** Update the runtime health status and probe timestamp for one instance. */
     @Modifying
     @Query("""

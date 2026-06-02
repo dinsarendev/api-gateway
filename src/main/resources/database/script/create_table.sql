@@ -214,3 +214,30 @@ CREATE TABLE IF NOT EXISTS public.oauth2_provider (
     updated_by         varchar(255) NULL,
     CONSTRAINT oauth2_provider_pkey PRIMARY KEY (id)
 );
+
+-- ── Incident Management ────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS public.incident (
+    id                bigserial     NOT NULL,
+    title             varchar(500)  NOT NULL,
+    description       varchar(2000) NULL,
+    severity          varchar(20)   NOT NULL DEFAULT 'HIGH',    -- CRITICAL | HIGH | MEDIUM | LOW
+    status            varchar(20)   NOT NULL DEFAULT 'OPEN',    -- OPEN | INVESTIGATING | RESOLVED | CLOSED
+    type              varchar(30)   NOT NULL,                   -- AVAILABILITY | PERFORMANCE | ERROR | INFRASTRUCTURE
+    trigger_key       varchar(255)  NULL,                       -- deduplication key for auto-created incidents
+    trigger_value     varchar(100)  NULL,                       -- actual measured value (e.g. "96.2%")
+    trigger_threshold varchar(100)  NULL,                       -- threshold that was breached (e.g. "10%")
+    affected_service  varchar(255)  NULL,                       -- group_code
+    affected_route    varchar(500)  NULL,                       -- path
+    source            varchar(10)   NOT NULL DEFAULT 'MANUAL',  -- MANUAL | AUTO
+    opened_at         timestamp(6)  NOT NULL DEFAULT NOW(),
+    resolved_at       timestamp(6)  NULL,
+    updated_at        timestamp(6)  NULL,
+    updated_by        varchar(255)  NULL,
+    created_by        varchar(255)  NULL,
+    CONSTRAINT incident_pkey PRIMARY KEY (id)
+);
+CREATE INDEX IF NOT EXISTS idx_incident_status      ON public.incident (status);
+CREATE INDEX IF NOT EXISTS idx_incident_severity    ON public.incident (severity);
+CREATE INDEX IF NOT EXISTS idx_incident_opened_at   ON public.incident (opened_at DESC);
+CREATE INDEX IF NOT EXISTS idx_incident_trigger_key ON public.incident (trigger_key) WHERE trigger_key IS NOT NULL;
