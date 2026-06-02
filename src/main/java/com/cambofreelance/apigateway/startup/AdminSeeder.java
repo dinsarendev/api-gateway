@@ -33,8 +33,10 @@ public class AdminSeeder {
         new String[]{"HEALTH_READ",      "View health monitor"},
         new String[]{"SECURITY_READ",    "View security settings"},
         new String[]{"SECURITY_WRITE",   "Manage API keys, IP rules, OAuth2 providers"},
-        new String[]{"USER_READ",        "View admin users and roles"},
-        new String[]{"USER_WRITE",       "Create / update / delete admin users and roles"}
+        new String[]{"USER_READ",        "View admin users"},
+        new String[]{"USER_WRITE",       "Create / update / delete admin users"},
+        new String[]{"ROLE_READ",        "View roles and permissions"},
+        new String[]{"ROLE_WRITE",       "Create / update / delete roles and assign permissions"}
     );
 
     @EventListener(ApplicationReadyEvent.class)
@@ -64,7 +66,8 @@ public class AdminSeeder {
             AdminRole operator = upsertRole("OPERATOR", "Manage routes and groups, read-only on security");
             List<String> operatorPerms = List.of(
                 "ROUTE_READ", "ROUTE_WRITE", "GROUP_READ", "GROUP_WRITE",
-                "REGISTRY_READ", "HEALTH_READ", "SECURITY_READ"
+                "REGISTRY_READ", "HEALTH_READ", "SECURITY_READ",
+                "ROLE_READ"
             );
             for (AdminPermission perm : allPerms) {
                 if (operatorPerms.contains(perm.getName())) {
@@ -82,7 +85,8 @@ public class AdminSeeder {
             // ── 5. Upsert VIEWER role + permissions ───────────────────────────
             AdminRole viewer = upsertRole("VIEWER", "Read-only access");
             List<String> viewerPerms = List.of(
-                "ROUTE_READ", "GROUP_READ", "REGISTRY_READ", "HEALTH_READ", "SECURITY_READ"
+                "ROUTE_READ", "GROUP_READ", "REGISTRY_READ", "HEALTH_READ", "SECURITY_READ",
+                "ROLE_READ", "USER_READ"
             );
             for (AdminPermission perm : allPerms) {
                 if (viewerPerms.contains(perm.getName())) {

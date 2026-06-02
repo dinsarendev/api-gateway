@@ -21,7 +21,11 @@ public final class Permissions {
     public static final String SECURITY_READ  = "SECURITY_READ";
     public static final String SECURITY_WRITE = "SECURITY_WRITE";
 
-    // ── Users & Roles ─────────────────────────────────────────────────────────
+    // ── Users ─────────────────────────────────────────────────────────────────
     public static final String USER_READ  = "USER_READ";
     public static final String USER_WRITE = "USER_WRITE";
+
+    // ── Roles & Permissions ───────────────────────────────────────────────────
+    public static final String ROLE_READ  = "ROLE_READ";
+    public static final String ROLE_WRITE = "ROLE_WRITE";
 }

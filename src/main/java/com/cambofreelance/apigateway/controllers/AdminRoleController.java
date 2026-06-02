@@ -32,7 +32,7 @@ public class AdminRoleController {
 
     @GetMapping("/permissions")
     public Mono<ResponseEntity<List<PermissionDto>>> listPermissions(ServerWebExchange exchange) {
-        return adminAuth.require(exchange, Permissions.USER_READ)
+        return adminAuth.require(exchange, Permissions.ROLE_READ)
             .then(permissionRepository.findAllActive()
                 .map(p -> new PermissionDto(p.getId(), p.getName(), p.getDescription()))
                 .collectList()
@@ -51,7 +51,7 @@ public class AdminRoleController {
         String searchParam = search.isBlank() ? null : "%" + search + "%";
         long   offset      = (long) page * size;
 
-        return adminAuth.require(exchange, Permissions.USER_READ).then(Mono.defer(() -> {
+        return adminAuth.require(exchange, Permissions.ROLE_READ).then(Mono.defer(() -> {
             Mono<Long> countMono = roleRepository.countByFilter(statusParam, searchParam);
             Mono<List<RoleDto>> rowsMono = roleRepository
                 .findByFilter(statusParam, searchParam, size, offset)
@@ -67,7 +67,7 @@ public class AdminRoleController {
 
     @GetMapping("/{id}")
     public Mono<ResponseEntity<RoleDto>> getById(@PathVariable Long id, ServerWebExchange exchange) {
-        return adminAuth.require(exchange, Permissions.USER_READ)
+        return adminAuth.require(exchange, Permissions.ROLE_READ)
             .then(roleRepository.findById(id)
                 .flatMap(r -> permissionRepository.findByRoleId(r.getId())
                     .map(p -> new PermissionDto(p.getId(), p.getName(), p.getDescription()))
@@ -78,7 +78,7 @@ public class AdminRoleController {
 
     @PostMapping
     public Mono<ResponseEntity<RoleDto>> create(@RequestBody RoleRequest req, ServerWebExchange exchange) {
-        return adminAuth.require(exchange, Permissions.USER_WRITE).then(Mono.defer(() -> {
+        return adminAuth.require(exchange, Permissions.ROLE_WRITE).then(Mono.defer(() -> {
             String actor = adminAuth.currentUser(exchange);
             AdminRole role = AdminRole.builder()
                 .name(req.name()).description(req.description())
@@ -98,7 +98,7 @@ public class AdminRoleController {
     @PutMapping("/{id}")
     public Mono<ResponseEntity<RoleDto>> update(
             @PathVariable Long id, @RequestBody RoleRequest req, ServerWebExchange exchange) {
-        return adminAuth.require(exchange, Permissions.USER_WRITE).then(Mono.defer(() -> {
+        return adminAuth.require(exchange, Permissions.ROLE_WRITE).then(Mono.defer(() -> {
             String actor = adminAuth.currentUser(exchange);
             return roleRepository.findById(id)
                 .flatMap(existing -> {
@@ -119,7 +119,7 @@ public class AdminRoleController {
     @PutMapping("/{id}/status")
     public Mono<ResponseEntity<Map<String, Object>>> updateStatus(
             @PathVariable Long id, @RequestBody StatusRequest req, ServerWebExchange exchange) {
-        return adminAuth.require(exchange, Permissions.USER_WRITE).then(Mono.defer(() -> {
+        return adminAuth.require(exchange, Permissions.ROLE_WRITE).then(Mono.defer(() -> {
             String actor = adminAuth.currentUser(exchange);
             return roleRepository.findById(id)
                 .flatMap(r -> roleRepository.updateStatus(id, req.status(), LocalDateTime.now(), actor))

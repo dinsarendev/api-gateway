@@ -16,6 +16,8 @@ export const PERMS = {
   SECURITY_WRITE:'SECURITY_WRITE',
   USER_READ:     'USER_READ',
   USER_WRITE:    'USER_WRITE',
+  ROLE_READ:     'ROLE_READ',
+  ROLE_WRITE:    'ROLE_WRITE',
 };
 
 export function AuthProvider({ children }) {

@@ -12,10 +12,11 @@ const EMPTY_FORM = { name: '', description: '', permissionIds: [] };
 const PERM_GROUPS = {
   ROUTE:    ['ROUTE_READ',    'ROUTE_WRITE'],
   GROUP:    ['GROUP_READ',    'GROUP_WRITE'],
-  REGISTRY: ['REGISTRY_READ'],
+  REGISTRY: ['REGISTRY_READ', 'REGISTRY_WRITE'],
   HEALTH:   ['HEALTH_READ'],
   SECURITY: ['SECURITY_READ', 'SECURITY_WRITE'],
   USER:     ['USER_READ',     'USER_WRITE'],
+  ROLE:     ['ROLE_READ',     'ROLE_WRITE'],
 };
 
 // ── Pagination ─────────────────────────────────────────────────────────────
@@ -158,7 +159,7 @@ function PermissionGrid({ allPermissions, selected, onChange }) {
 export default function Roles() {
   const toast    = useToast();
   const { can }  = useAuth();
-  const canWrite = can(PERMS.USER_WRITE);
+  const canWrite = can(PERMS.ROLE_WRITE);
 
   const [roles,       setRoles]       = useState([]);
   const [total,       setTotal]       = useState(0);
