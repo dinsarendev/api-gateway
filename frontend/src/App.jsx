@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import { ToastProvider } from './context/ToastContext';
@@ -36,6 +36,11 @@ function Layout({ sidebarOpen, setSidebarOpen }) {
   const { pathname } = useLocation();
   const { theme, toggle: toggleTheme } = useTheme();
   const reload = () => window.location.reload();
+
+  useEffect(() => {
+    const page = TITLES[pathname] || 'Admin';
+    document.title = `API Gateway — ${page}`;
+  }, [pathname]);
 
   return (
     <div id="app">

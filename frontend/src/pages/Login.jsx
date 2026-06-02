@@ -7,6 +7,7 @@ export default function Login({ onLogin }) {
   const [password, setPassword] = useState('');
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState('');
+  const [showPwd,  setShowPwd]  = useState(false);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -79,14 +80,29 @@ export default function Login({ onLogin }) {
             <label style={{ display: 'block', fontWeight: 600, fontSize: '.85rem', marginBottom: '.4rem', color: 'var(--text-primary)' }}>
               Password
             </label>
-            <input
-              className="form-control"
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder="••••••••"
-              autoComplete="current-password"
-            />
+            <div style={{ position: 'relative' }}>
+              <input
+                className="form-control"
+                type={showPwd ? 'text' : 'password'}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="••••••••"
+                autoComplete="current-password"
+                style={{ paddingRight: '2.5rem' }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPwd(v => !v)}
+                style={{
+                  position: 'absolute', top: '50%', right: '.75rem', transform: 'translateY(-50%)',
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: 'var(--text-secondary)', padding: 0, lineHeight: 1,
+                }}
+                aria-label={showPwd ? 'Hide password' : 'Show password'}
+              >
+                <i className={`fa-solid ${showPwd ? 'fa-eye-slash' : 'fa-eye'}`} />
+              </button>
+            </div>
           </div>
 
           <button
