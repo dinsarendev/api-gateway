@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-route
 import Sidebar from './components/Sidebar';
 import { ToastProvider } from './context/ToastContext';
 import { AuthProvider } from './context/AuthContext';
+import { ThemeProvider, useTheme } from './context/ThemeContext';
 import Dashboard       from './pages/Dashboard';
 import Groups          from './pages/Groups';
 import Health          from './pages/Health';
@@ -31,26 +32,52 @@ const TITLES = {
   '/profile':           'My Profile',
 };
 
-// eslint-disable-next-line no-unused-vars
-function Layout({ onLogout }) {
+function Layout({ sidebarOpen, setSidebarOpen }) {
   const { pathname } = useLocation();
+  const { theme, toggle: toggleTheme } = useTheme();
   const reload = () => window.location.reload();
 
   return (
     <div id="app">
-      <Sidebar />
+      {/* Mobile backdrop */}
+      <div
+        className={`sidebar-overlay${sidebarOpen ? ' open' : ''}`}
+        onClick={() => setSidebarOpen(false)}
+      />
+
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+
       <div id="main">
         <header id="topbar">
-          <div className="topbar-title">{TITLES[pathname] || 'Admin'}</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
-            <span style={{ fontSize: '.75rem', background: '#dcfce7', color: '#166534', borderRadius: '999px', padding: '.2em .65em', fontWeight: 600 }}>
+          <div className="topbar-left">
+            <button className="btn-hamburger" onClick={() => setSidebarOpen(s => !s)} aria-label="Toggle menu">
+              <i className="fa-solid fa-bars" />
+            </button>
+            <div className="topbar-title">{TITLES[pathname] || 'Admin'}</div>
+          </div>
+
+          <div className="topbar-right">
+            <span
+              className="gateway-badge"
+              style={{ fontSize: '.75rem', background: '#dcfce7', color: '#166534', borderRadius: '999px', padding: '.2em .65em', fontWeight: 600, whiteSpace: 'nowrap' }}
+            >
               <i className="fa-solid fa-circle-check" style={{ marginRight: '.3rem' }} />Gateway Online
             </span>
+
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={toggleTheme}
+              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              <i className={`fa-solid ${theme === 'dark' ? 'fa-sun' : 'fa-moon'}`} />
+            </button>
+
             <button className="btn btn-secondary btn-sm" onClick={reload}>
               <i className="fa-solid fa-arrows-rotate" /> Refresh
             </button>
           </div>
         </header>
+
         <div id="content">
           <Routes>
             <Route path="/"                  element={<Dashboard />} />
@@ -73,18 +100,25 @@ function Layout({ onLogout }) {
 }
 
 export default function App() {
-  const [loggedIn, setLoggedIn] = useState(auth.isLoggedIn());
+  const [loggedIn, setLoggedIn]       = useState(auth.isLoggedIn());
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleLogin = () => setLoggedIn(true);
 
   return (
     <BrowserRouter>
-      <ToastProvider>
-        {loggedIn
-          ? <AuthProvider><Layout /></AuthProvider>
-          : <Login onLogin={handleLogin} />
-        }
-      </ToastProvider>
+      <ThemeProvider>
+        <ToastProvider>
+          {loggedIn
+            ? (
+              <AuthProvider>
+                <Layout sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+              </AuthProvider>
+            )
+            : <Login onLogin={handleLogin} />
+          }
+        </ToastProvider>
+      </ThemeProvider>
     </BrowserRouter>
   );
 }

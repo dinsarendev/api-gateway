@@ -1,17 +1,19 @@
 import { NavLink } from 'react-router-dom';
 import { auth } from '../auth';
 import { API }  from '../api/gateway';
-import { useToast } from '../context/ToastContext';
 import { useAuth, PERMS } from '../context/AuthContext';
 
-const NavItem = ({ to, icon, label }) => (
-  <NavLink to={to} className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
+const NavItem = ({ to, icon, label, onClick }) => (
+  <NavLink
+    to={to}
+    onClick={onClick}
+    className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+  >
     <i className={`fa-solid ${icon}`} />{label}
   </NavLink>
 );
 
-export default function Sidebar() {
-  const toast   = useToast();
+export default function Sidebar({ isOpen, onClose }) {
   const { can } = useAuth();
 
   const logout = async () => {
@@ -22,39 +24,41 @@ export default function Sidebar() {
 
   const username = auth.getUsername();
   const fullName = auth.getFullName();
+  const initial  = (fullName || username || '?')[0].toUpperCase();
 
   return (
-    <nav id="sidebar">
+    <nav id="sidebar" className={isOpen ? 'open' : ''}>
       <div className="sidebar-brand">
-        <i className="fa-solid fa-network-wired" />
+        <i className="fa-solid fa-network-wired brand-icon" />
         <span>API Gateway</span>
+        <button className="sidebar-close" onClick={onClose} aria-label="Close menu">
+          <i className="fa-solid fa-xmark" />
+        </button>
       </div>
 
       {/* Logged-in user — links to profile page */}
-      <NavLink to="/profile" style={{ textDecoration: 'none' }}>
-        <div style={{
-          padding: '.75rem 1.2rem', borderBottom: '1px solid #1e293b',
-          display: 'flex', alignItems: 'center', gap: '.6rem',
-          cursor: 'pointer',
-        }}
-          onMouseEnter={e => e.currentTarget.style.background = '#1e293b'}
-          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+      <NavLink to="/profile" onClick={onClose} style={{ textDecoration: 'none' }}>
+        <div
+          style={{
+            padding: '.75rem 1.2rem', borderBottom: '1px solid #1e293b',
+            display: 'flex', alignItems: 'center', gap: '.6rem', cursor: 'pointer',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = '#1e293b'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
         >
           <div style={{
             width: 30, height: 30, borderRadius: '50%',
             background: '#1d4ed8', display: 'flex', alignItems: 'center',
             justifyContent: 'center', fontSize: '.8rem', color: '#fff', fontWeight: 700, flexShrink: 0,
           }}>
-            {(fullName || username || '?')[0].toUpperCase()}
+            {initial}
           </div>
           <div style={{ overflow: 'hidden', flex: 1 }}>
-            <div style={{ fontSize: '.82rem', fontWeight: 600, color: '#f1f5f9',
-              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <div style={{ fontSize: '.82rem', fontWeight: 600, color: '#f1f5f9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {fullName || username}
             </div>
             {fullName && (
-              <div style={{ fontSize: '.7rem', color: '#64748b',
-                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <div style={{ fontSize: '.7rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 @{username}
               </div>
             )}
@@ -64,42 +68,42 @@ export default function Sidebar() {
       </NavLink>
 
       <div className="sidebar-section">OVERVIEW</div>
-      <NavItem to="/" icon="fa-gauge-high" label="Dashboard" />
+      <NavItem to="/" icon="fa-gauge-high" label="Dashboard" onClick={onClose} />
 
       {(can(PERMS.ROUTE_READ) || can(PERMS.GROUP_READ)) && (
         <div className="sidebar-section">ROUTING</div>
       )}
       {can(PERMS.ROUTE_READ) && (
-        <NavItem to="/routes" icon="fa-route" label="Routes" />
+        <NavItem to="/routes" icon="fa-route" label="Routes" onClick={onClose} />
       )}
       {can(PERMS.GROUP_READ) && (
-        <NavItem to="/groups" icon="fa-layer-group" label="Service Groups" />
+        <NavItem to="/groups" icon="fa-layer-group" label="Service Groups" onClick={onClose} />
       )}
 
       {(can(PERMS.REGISTRY_READ) || can(PERMS.HEALTH_READ)) && (
         <div className="sidebar-section">INFRASTRUCTURE</div>
       )}
       {can(PERMS.REGISTRY_READ) && (
-        <NavItem to="/registry" icon="fa-server" label="Service Registry" />
+        <NavItem to="/registry" icon="fa-server" label="Service Registry" onClick={onClose} />
       )}
       {can(PERMS.HEALTH_READ) && (
-        <NavItem to="/health" icon="fa-heart-pulse" label="Health Monitor" />
+        <NavItem to="/health" icon="fa-heart-pulse" label="Health Monitor" onClick={onClose} />
       )}
 
       {can(PERMS.SECURITY_READ) && (
         <>
           <div className="sidebar-section">SECURITY</div>
-          <NavItem to="/security/api-keys" icon="fa-key"           label="API Keys" />
-          <NavItem to="/security/ip-acl"   icon="fa-shield-halved" label="IP Access Control" />
-          <NavItem to="/security/oauth2"   icon="fa-id-badge"      label="OAuth2 Providers" />
+          <NavItem to="/security/api-keys" icon="fa-key"           label="API Keys"         onClick={onClose} />
+          <NavItem to="/security/ip-acl"   icon="fa-shield-halved" label="IP Access Control" onClick={onClose} />
+          <NavItem to="/security/oauth2"   icon="fa-id-badge"      label="OAuth2 Providers" onClick={onClose} />
         </>
       )}
 
       {can(PERMS.USER_READ) && (
         <>
           <div className="sidebar-section">ADMINISTRATION</div>
-          <NavItem to="/users" icon="fa-users"       label="Users" />
-          <NavItem to="/roles" icon="fa-user-shield" label="Roles" />
+          <NavItem to="/users" icon="fa-users"       label="Users" onClick={onClose} />
+          <NavItem to="/roles" icon="fa-user-shield" label="Roles" onClick={onClose} />
         </>
       )}
 

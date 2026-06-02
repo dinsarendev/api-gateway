@@ -30,7 +30,7 @@ export default function Login({ onLogin }) {
       background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%)',
     }}>
       <div style={{
-        width: 380, background: '#fff', borderRadius: 12,
+        width: 380, background: 'var(--bg-surface)', borderRadius: 12,
         boxShadow: '0 20px 60px rgba(0,0,0,.35)', overflow: 'hidden',
       }}>
         {/* Header */}
@@ -62,7 +62,7 @@ export default function Login({ onLogin }) {
           )}
 
           <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', fontWeight: 600, fontSize: '.85rem', marginBottom: '.4rem', color: '#374151' }}>
+            <label style={{ display: 'block', fontWeight: 600, fontSize: '.85rem', marginBottom: '.4rem', color: 'var(--text-primary)' }}>
               Username
             </label>
             <input
@@ -76,7 +76,7 @@ export default function Login({ onLogin }) {
           </div>
 
           <div style={{ marginBottom: '1.5rem' }}>
-            <label style={{ display: 'block', fontWeight: 600, fontSize: '.85rem', marginBottom: '.4rem', color: '#374151' }}>
+            <label style={{ display: 'block', fontWeight: 600, fontSize: '.85rem', marginBottom: '.4rem', color: 'var(--text-primary)' }}>
               Password
             </label>
             <input
