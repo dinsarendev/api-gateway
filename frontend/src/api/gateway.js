@@ -86,6 +86,11 @@ export const API = {
   updateOAuth2Provider: (id, data) => put(`/admin/oauth2-providers/${id}`, data),
   deleteOAuth2Provider: (id)       => del(`/admin/oauth2-providers/${id}`),
 
+  // ── Monitoring ────────────────────────────────────────────────────────────
+  getGatewayMetrics:  (window = 60) => get(`/admin/metrics/gateway?window=${window}`),
+  getApiMetrics:      (window = 1, limit = 10) => get(`/admin/metrics/apis?window=${window}&limit=${limit}`),
+  getConsumerMetrics: (window = 1, limit = 10) => get(`/admin/metrics/consumers?window=${window}&limit=${limit}`),
+
   // ── Roles ─────────────────────────────────────────────────────────────────
   getRoles:       (params = {}) => {
     const q = new URLSearchParams({ status: 'ACT', search: '', page: 0, size: 15, ...params }).toString();

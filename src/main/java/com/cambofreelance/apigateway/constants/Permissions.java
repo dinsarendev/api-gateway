@@ -28,4 +28,7 @@ public final class Permissions {
     // ── Roles & Permissions ───────────────────────────────────────────────────
     public static final String ROLE_READ  = "ROLE_READ";
     public static final String ROLE_WRITE = "ROLE_WRITE";
+
+    // ── Monitoring ────────────────────────────────────────────────────────────
+    public static final String MONITORING_READ = "MONITORING_READ";
 }

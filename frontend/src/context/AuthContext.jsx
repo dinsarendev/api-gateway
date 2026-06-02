@@ -18,6 +18,7 @@ export const PERMS = {
   USER_WRITE:    'USER_WRITE',
   ROLE_READ:     'ROLE_READ',
   ROLE_WRITE:    'ROLE_WRITE',
+  MONITORING_READ: 'MONITORING_READ',
 };
 
 export function AuthProvider({ children }) {
@@ -27,12 +28,14 @@ export function AuthProvider({ children }) {
     const permSet     = new Set(permissions);
     const roleSet     = new Set(roles);
 
+    const isSuperAdmin = roleSet.has('SUPER_ADMIN');
+
     return {
       roles,
       permissions,
-      can:          (perm)  => permSet.has(perm),
+      can:          (perm)  => isSuperAdmin || permSet.has(perm),
       hasRole:      (role)  => roleSet.has(role),
-      isSuperAdmin: ()      => roleSet.has('SUPER_ADMIN'),
+      isSuperAdmin: ()      => isSuperAdmin,
     };
   }, []);
 

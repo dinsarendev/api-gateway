@@ -87,6 +87,13 @@ export default function Sidebar({ isOpen, onClose }) {
         <NavItem to="/groups" icon="fa-layer-group" label="Service Groups" onClick={onClose} />
       )}
 
+      {can(PERMS.MONITORING_READ) && (
+        <>
+          <div className="sidebar-section">MONITORING</div>
+          <NavItem to="/monitoring" icon="fa-chart-line" label="Monitoring" onClick={onClose} />
+        </>
+      )}
+
       {(can(PERMS.REGISTRY_READ) || can(PERMS.HEALTH_READ)) && (
         <div className="sidebar-section">INFRASTRUCTURE</div>
       )}

@@ -11,6 +11,7 @@ import com.cambofreelance.apigateway.exception.MessageResponse;
 import com.cambofreelance.apigateway.security.IpFilterService;
 import com.cambofreelance.apigateway.security.SecurityPrincipal;
 import com.cambofreelance.apigateway.security.SecurityService;
+import com.cambofreelance.apigateway.service.impl.MetricsCollector;
 import com.cambofreelance.apigateway.service.impl.RateLimiterService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -41,19 +42,22 @@ public class RequestLoggingFilter implements GlobalFilter {
     private final IpFilterService ipFilterService;
     private final ObjectMapper objectMapper;
     private final Tracer tracer;
+    private final MetricsCollector metricsCollector;
 
     public RequestLoggingFilter(RateLimiterService rateLimiterService,
                                 ApiRouteManagerRedisCache apiRouteManagerRedisCache,
                                 SecurityService securityService,
                                 IpFilterService ipFilterService,
                                 ObjectMapper objectMapper,
-                                Tracer tracer) {
+                                Tracer tracer,
+                                MetricsCollector metricsCollector) {
         this.rateLimiterService           = rateLimiterService;
         this.apiRouteManagerRedisCache    = apiRouteManagerRedisCache;
         this.securityService              = securityService;
         this.ipFilterService              = ipFilterService;
         this.objectMapper                 = objectMapper;
         this.tracer                       = tracer;
+        this.metricsCollector             = metricsCollector;
     }
 
     @Override
@@ -66,6 +70,7 @@ public class RequestLoggingFilter implements GlobalFilter {
             return chain.filter(exchange);
         }
 
+        long startNano       = System.nanoTime();
         String clientIp      = resolveClientIp(request);
         String correlationId = resolveCorrelationId(request);
 
@@ -79,7 +84,8 @@ public class RequestLoggingFilter implements GlobalFilter {
             routeDto = ApiRouteManagerCache.get(path, method);
         }
         if (routeDto == null) {
-            return errorResponse(exchange, HttpStatus.NOT_FOUND, ErrorCode.ERR_00404, "API route not found");
+            return errorResponse(exchange, HttpStatus.NOT_FOUND, ErrorCode.ERR_00404, "API route not found")
+                .doFinally(s -> metricsCollector.record(null, 404, elapsedMs(startNano), clientIp));
         }
 
         final ApiRouteDto route = routeDto;
@@ -117,7 +123,17 @@ public class RequestLoggingFilter implements GlobalFilter {
                         errorResponse(exchange, HttpStatus.FORBIDDEN, ErrorCode.ERR_00403, e.getMessage()))
                     .onErrorResume(SecurityException.class, e ->
                         errorResponse(exchange, HttpStatus.UNAUTHORIZED, ErrorCode.ERR_00401, e.getMessage()));
+            })
+            .doFinally(s -> {
+                long ms = elapsedMs(startNano);
+                int status = exchange.getResponse().getStatusCode() != null
+                    ? exchange.getResponse().getStatusCode().value() : 200;
+                metricsCollector.record(route, status, ms, clientIp);
             });
+    }
+
+    private long elapsedMs(long startNano) {
+        return (System.nanoTime() - startNano) / 1_000_000;
     }
 
     private ServerWebExchange withUpstreamHeaders(ServerWebExchange exchange,

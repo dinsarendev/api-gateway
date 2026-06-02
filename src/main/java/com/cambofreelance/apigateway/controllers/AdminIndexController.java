@@ -20,6 +20,7 @@ public class AdminIndexController {
     @GetMapping(value = {
         "/", "/dashboard",
         "/routes", "/groups", "/registry", "/health",
+        "/monitoring",
         "/security/api-keys", "/security/ip-acl", "/security/oauth2",
         "/users", "/roles", "/profile",
     }, produces = MediaType.TEXT_HTML_VALUE)

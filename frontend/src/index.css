@@ -280,6 +280,14 @@ tbody tr:hover { background: var(--bg-surface-hover); }
 .btn-slot-blue:hover:not(:disabled)  { background: #1e40af; border-color: #1e40af; }
 .btn-slot-swap:disabled { opacity: .6; cursor: default; }
 
+/* ── Monitoring ──────────────────────────────────────────────────── */
+.stat-card-col { flex-direction: column; align-items: flex-start; }
+.stat-sub      { font-size: .72rem; color: var(--muted); margin-top: .15rem; }
+.sparkline          { display: flex; align-items: flex-end; gap: 2px; height: 50px; overflow: hidden; }
+.spark-bar-wrap     { flex: 1; display: flex; align-items: flex-end; min-width: 2px; }
+.spark-bar          { width: 100%; border-radius: 2px 2px 0 0; transition: height .2s; min-height: 2px; }
+.sparkline-empty    { font-size: .75rem; color: var(--muted); padding: .5rem 0; }
+
 .reg-card { border: 1px solid var(--border); border-radius: .75rem; background: var(--bg-surface); overflow: hidden; }
 .reg-card-header { padding: .9rem 1.2rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
 .reg-card-body { padding: 1.2rem; }
