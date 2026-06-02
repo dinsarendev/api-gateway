@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { API } from '../api/gateway';
 import { auth } from '../auth';
+import { useBrand } from '../context/BrandContext';
 
 export default function Login({ onLogin }) {
+  const { brand } = useBrand();
+
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading,  setLoading]  = useState(false);
@@ -28,7 +31,7 @@ export default function Login({ onLogin }) {
   return (
     <div style={{
       minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%)',
+      background: `linear-gradient(135deg, ${brand.loginBgFrom} 0%, ${brand.loginBgTo} 100%)`,
     }}>
       <div style={{
         width: 380, background: 'var(--bg-surface)', borderRadius: 12,
@@ -36,16 +39,19 @@ export default function Login({ onLogin }) {
       }}>
         {/* Header */}
         <div style={{
-          background: 'linear-gradient(135deg, #1d4ed8, #0f172a)',
+          background: `linear-gradient(135deg, ${brand.accentColor}, ${brand.loginBgFrom})`,
           padding: '2rem', textAlign: 'center', color: '#fff',
         }}>
           <div style={{ fontSize: '2rem', marginBottom: '.5rem' }}>
-            <i className="fa-solid fa-network-wired" />
+            {brand.brandLogo
+              ? <img src={brand.brandLogo} alt={brand.brandName} style={{ height: 48, objectFit: 'contain', display: 'block', margin: '0 auto .25rem' }} />
+              : <i className="fa-solid fa-network-wired" />
+            }
           </div>
           <div style={{ fontWeight: 800, fontSize: '1.2rem', letterSpacing: '.04em' }}>
-            API Gateway
+            {brand.brandName}
           </div>
-          <div style={{ fontSize: '.8rem', color: '#93c5fd', marginTop: '.25rem' }}>
+          <div style={{ fontSize: '.8rem', color: 'rgba(255,255,255,.7)', marginTop: '.25rem' }}>
             Admin Console
           </div>
         </div>
@@ -109,7 +115,8 @@ export default function Login({ onLogin }) {
             type="submit"
             disabled={loading}
             style={{
-              width: '100%', padding: '.75rem', background: loading ? '#93c5fd' : '#1d4ed8',
+              width: '100%', padding: '.75rem',
+              background: loading ? 'var(--accent-hover)' : brand.accentColor,
               color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700,
               fontSize: '.95rem', cursor: loading ? 'not-allowed' : 'pointer',
               transition: 'background .2s',

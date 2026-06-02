@@ -2,6 +2,7 @@ import { NavLink } from 'react-router-dom';
 import { auth } from '../auth';
 import { API }  from '../api/gateway';
 import { useAuth, PERMS } from '../context/AuthContext';
+import { useBrand } from '../context/BrandContext';
 
 const NavItem = ({ to, icon, label, onClick }) => (
   <NavLink
@@ -15,6 +16,7 @@ const NavItem = ({ to, icon, label, onClick }) => (
 
 export default function Sidebar({ isOpen, onClose }) {
   const { can } = useAuth();
+  const { brand } = useBrand();
 
   const logout = async () => {
     try { await API.logout(); } catch { /* ignore */ }
@@ -29,8 +31,13 @@ export default function Sidebar({ isOpen, onClose }) {
   return (
     <nav id="sidebar" className={isOpen ? 'open' : ''}>
       <div className="sidebar-brand">
-        <i className="fa-solid fa-network-wired brand-icon" />
-        <span>API Gateway</span>
+        {brand.brandLogo
+          ? <img src={brand.brandLogo} alt="" style={{ height: 22, objectFit: 'contain', flexShrink: 0 }} />
+          : <i className="fa-solid fa-network-wired brand-icon" />
+        }
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {brand.brandName}
+        </span>
         <button className="sidebar-close" onClick={onClose} aria-label="Close menu">
           <i className="fa-solid fa-xmark" />
         </button>

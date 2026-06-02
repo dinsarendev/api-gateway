@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { API } from '../api/gateway';
 import { auth } from '../auth';
 import { useToast } from '../context/ToastContext';
+import { useBrand, BRAND_DEFAULTS } from '../context/BrandContext';
 
 const ROLE_COLORS = {
   SUPER_ADMIN: { bg: '#ede9fe', color: '#5b21b6' },
@@ -11,6 +12,8 @@ const ROLE_COLORS = {
 
 export default function Profile() {
   const toast = useToast();
+  const { brand, update: updateBrand, reset: resetBrand } = useBrand();
+  const [draft, setDraft] = useState({ ...brand });
 
   const [profile, setProfile]           = useState({ fullName: auth.getFullName(), email: '' });
   const [roles, setRoles]               = useState(auth.getRoles());
@@ -218,6 +221,143 @@ export default function Profile() {
         </div>
 
       </div>
+
+      {/* ── Branding & Appearance ────────────────────────────────────── */}
+      <div className="card">
+        <div className="card-header">
+          <span><i className="fa-solid fa-palette" style={{ marginRight: '.5rem', color: '#3b82f6' }} />Branding &amp; Appearance</span>
+        </div>
+        <div className="card-body">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+
+            {/* Settings column */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Company / App Name</label>
+                <input
+                  className="form-control"
+                  value={draft.brandName}
+                  onChange={e => setDraft(d => ({ ...d, brandName: e.target.value }))}
+                  placeholder="API Gateway"
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">
+                  Logo URL <span className="text-muted text-sm">(blank = default icon)</span>
+                </label>
+                <input
+                  className="form-control"
+                  value={draft.brandLogo}
+                  onChange={e => setDraft(d => ({ ...d, brandLogo: e.target.value }))}
+                  placeholder="https://example.com/logo.png"
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Login Background</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem' }}>
+                  <div>
+                    <div className="form-hint" style={{ marginBottom: '.25rem' }}>From</div>
+                    <input
+                      type="color"
+                      value={draft.loginBgFrom}
+                      onChange={e => setDraft(d => ({ ...d, loginBgFrom: e.target.value }))}
+                      style={{ width: 44, height: 34, padding: 2, border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', background: 'none' }}
+                    />
+                  </div>
+                  <i className="fa-solid fa-arrow-right" style={{ color: 'var(--muted)', marginTop: '1rem' }} />
+                  <div>
+                    <div className="form-hint" style={{ marginBottom: '.25rem' }}>To</div>
+                    <input
+                      type="color"
+                      value={draft.loginBgTo}
+                      onChange={e => setDraft(d => ({ ...d, loginBgTo: e.target.value }))}
+                      style={{ width: 44, height: 34, padding: 2, border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', background: 'none' }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Accent Color</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem' }}>
+                  <input
+                    type="color"
+                    value={draft.accentColor}
+                    onChange={e => setDraft(d => ({ ...d, accentColor: e.target.value }))}
+                    style={{ width: 44, height: 34, padding: 2, border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', background: 'none' }}
+                  />
+                  <span className="text-muted text-sm">Buttons, active nav, highlights</span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '.5rem', marginTop: '.25rem' }}>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => { updateBrand(draft); toast.success('Branding applied'); }}
+                >
+                  <i className="fa-solid fa-floppy-disk" /> Apply
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => { resetBrand(); setDraft({ ...BRAND_DEFAULTS }); toast.success('Reset to defaults'); }}
+                >
+                  <i className="fa-solid fa-rotate-left" /> Reset
+                </button>
+              </div>
+            </div>
+
+            {/* Live preview column */}
+            <div>
+              <div className="form-label" style={{ marginBottom: '.75rem' }}>Preview</div>
+              <div style={{ borderRadius: 10, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,.2)', maxWidth: 220, margin: '0 auto' }}>
+                {/* Login header preview */}
+                <div style={{
+                  background: `linear-gradient(135deg, ${draft.accentColor}, ${draft.loginBgFrom})`,
+                  padding: '1rem', textAlign: 'center', color: '#fff',
+                }}>
+                  {draft.brandLogo
+                    ? <img src={draft.brandLogo} alt="" style={{ height: 28, objectFit: 'contain', display: 'block', margin: '0 auto .3rem' }} onError={e => { e.target.style.display = 'none'; }} />
+                    : <i className="fa-solid fa-network-wired" style={{ fontSize: '1.3rem', display: 'block', marginBottom: '.3rem' }} />
+                  }
+                  <div style={{ fontWeight: 700, fontSize: '.82rem' }}>{draft.brandName || 'API Gateway'}</div>
+                  <div style={{ fontSize: '.65rem', opacity: .7 }}>Admin Console</div>
+                </div>
+                {/* Form fields mock */}
+                <div style={{
+                  background: `linear-gradient(135deg, ${draft.loginBgFrom} 0%, ${draft.loginBgTo} 100%)`,
+                  padding: '.75rem', display: 'flex', flexDirection: 'column', gap: '.4rem',
+                }}>
+                  <div style={{ height: 22, borderRadius: 4, background: 'rgba(255,255,255,.15)' }} />
+                  <div style={{ height: 22, borderRadius: 4, background: 'rgba(255,255,255,.15)' }} />
+                  <div style={{ height: 26, borderRadius: 5, background: draft.accentColor, opacity: .9 }} />
+                </div>
+              </div>
+
+              {/* Sidebar brand preview */}
+              <div style={{ marginTop: '1rem', maxWidth: 220, margin: '1rem auto 0' }}>
+                <div className="form-hint" style={{ marginBottom: '.4rem', textAlign: 'center' }}>Sidebar brand</div>
+                <div style={{
+                  background: '#0f172a', borderRadius: 8, padding: '.65rem 1rem',
+                  display: 'flex', alignItems: 'center', gap: '.5rem',
+                }}>
+                  {draft.brandLogo
+                    ? <img src={draft.brandLogo} alt="" style={{ height: 18, objectFit: 'contain', flexShrink: 0 }} onError={e => { e.target.style.display = 'none'; }} />
+                    : <i className="fa-solid fa-network-wired" style={{ color: draft.accentColor, fontSize: '.95rem' }} />
+                  }
+                  <span style={{ color: '#f1f5f9', fontWeight: 700, fontSize: '.82rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {draft.brandName || 'API Gateway'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
     </div>
   );
 }

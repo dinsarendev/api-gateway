@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar';
 import { ToastProvider } from './context/ToastContext';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
+import { BrandProvider } from './context/BrandContext';
 import Dashboard       from './pages/Dashboard';
 import Groups          from './pages/Groups';
 import Health          from './pages/Health';
@@ -113,16 +114,18 @@ export default function App() {
   return (
     <BrowserRouter>
       <ThemeProvider>
-        <ToastProvider>
-          {loggedIn
-            ? (
-              <AuthProvider>
-                <Layout sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-              </AuthProvider>
-            )
-            : <Login onLogin={handleLogin} />
-          }
-        </ToastProvider>
+        <BrandProvider>
+          <ToastProvider>
+            {loggedIn
+              ? (
+                <AuthProvider>
+                  <Layout sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+                </AuthProvider>
+              )
+              : <Login onLogin={handleLogin} />
+            }
+          </ToastProvider>
+        </BrandProvider>
       </ThemeProvider>
     </BrowserRouter>
   );
