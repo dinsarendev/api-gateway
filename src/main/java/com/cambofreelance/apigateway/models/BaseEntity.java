@@ -22,7 +22,9 @@ public class BaseEntity implements Serializable {
 
     @Serial
     private static final long serialVersionUID = -8892838641805537110L;
+    @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
+    @Builder.Default
     private String createdBy = Constants.SYSTEM;
     private LocalDateTime updatedAt;
     private String updatedBy;

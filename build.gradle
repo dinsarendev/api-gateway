@@ -90,13 +90,15 @@ tasks.named('test') {
 
 // ── Frontend (React + Vite) ─────────────────────────────────────────────────
 def frontendDir = "$projectDir/frontend"
+def isWindows   = org.gradle.internal.os.OperatingSystem.current().isWindows()
+def npmCmd      = isWindows ? 'npm.cmd' : 'npm'
 
 task npmInstall(type: Exec) {
     description = 'Install frontend dependencies'
     workingDir  frontendDir
     inputs.file  "$frontendDir/package.json"
     outputs.dir  "$frontendDir/node_modules"
-    commandLine  'sh', '-c', 'npm install --prefer-offline'
+    commandLine  npmCmd, 'install', '--prefer-offline'
 }
 
 task npmBuild(type: Exec, dependsOn: npmInstall) {
@@ -105,7 +107,7 @@ task npmBuild(type: Exec, dependsOn: npmInstall) {
     inputs.dir  "$frontendDir/src"
     inputs.file "$frontendDir/vite.config.js"
     outputs.dir "$projectDir/src/main/resources/static"
-    commandLine 'sh', '-c', 'npm run build'
+    commandLine  npmCmd, 'run', 'build'
 }
 
 processResources.dependsOn npmBuild
