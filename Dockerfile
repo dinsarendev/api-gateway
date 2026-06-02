@@ -1,12 +1,23 @@
+FROM nexus.cambofreelance.com/docker-hosted/core/node:20-alpine AS frontend-builder
+
+WORKDIR /app/frontend
+
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+
+COPY frontend/ ./
+RUN npm run build
+
 FROM nexus.cambofreelance.com/docker-hosted/core/gradle:8.5-jdk21 AS builder
 
 WORKDIR /app
 
 COPY gradle gradle
 COPY build.gradle settings.gradle ./
-# ✅ Copy credentials file
 COPY gradle.properties /root/.gradle/gradle.properties
 COPY src ./src
+
+COPY --from=frontend-builder /app/src/main/resources/static ./src/main/resources/static
 
 ENV TZ=Asia/Phnom_Penh
 
