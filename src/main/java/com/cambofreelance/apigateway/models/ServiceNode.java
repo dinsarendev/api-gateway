@@ -49,4 +49,8 @@ public class ServiceNode extends BaseEntity implements Serializable {
 
     @Column("last_health_check")
     private LocalDateTime lastHealthCheck;
+
+    /** Custom health probe path. NULL or blank = skip probe, treat as always UP. */
+    @Column("health_path")
+    private String healthPath;
 }

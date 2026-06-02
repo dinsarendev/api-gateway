@@ -29,4 +29,32 @@ public interface ServiceNodeRepository extends R2dbcRepository<ServiceNode, Long
                                      String healthStatus,
                                      LocalDateTime lastHealthCheck,
                                      LocalDateTime updatedAt);
+
+    /** Full field update for an existing instance (excluding health status). */
+    @Modifying
+    @Query("""
+        UPDATE service_instance
+           SET service_id   = :serviceId,
+               host         = :host,
+               port         = :port,
+               secure       = :secure,
+               weight       = :weight,
+               health_path  = :healthPath,
+               updated_at   = :updatedAt,
+               updated_by   = :updatedBy
+         WHERE id = :id
+        """)
+    Mono<Integer> updateInstance(Long id,
+                                 String serviceId, String host, Integer port,
+                                 boolean secure, Integer weight, String healthPath,
+                                 LocalDateTime updatedAt, String updatedBy);
+
+    /** Soft-delete: mark inactive. */
+    @Modifying
+    @Query("""
+        UPDATE service_instance
+           SET status = 'INACT', updated_at = :updatedAt, updated_by = :updatedBy
+         WHERE id = :id
+        """)
+    Mono<Integer> softDelete(Long id, LocalDateTime updatedAt, String updatedBy);
 }

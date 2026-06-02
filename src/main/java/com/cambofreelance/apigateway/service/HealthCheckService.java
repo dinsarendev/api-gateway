@@ -6,6 +6,7 @@ import com.cambofreelance.apigateway.models.ServiceNode;
 import com.cambofreelance.apigateway.repositories.ServiceNodeRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -81,6 +82,12 @@ public class HealthCheckService {
     }
 
     private Mono<ServiceNode> probeAndPersist(ServiceNode node) {
+        // health_path explicitly empty → skip probe, always treat as UP
+        if (node.getHealthPath() != null && node.getHealthPath().isBlank()) {
+            node.setHealthStatus(STATUS_UP);
+            node.setLastHealthCheck(LocalDateTime.now());
+            return Mono.just(node);
+        }
         String url = buildHealthUrl(node);
         return probe(url)
             .flatMap(newStatus -> {
@@ -117,8 +124,9 @@ public class HealthCheckService {
     }
 
     private String buildHealthUrl(ServiceNode node) {
+        String path = StringUtils.isNotBlank(node.getHealthPath()) ? node.getHealthPath() : HEALTH_PATH;
         return (node.isSecure() ? "https" : "http")
-            + "://" + node.getHost() + ":" + node.getPort() + HEALTH_PATH;
+            + "://" + node.getHost() + ":" + node.getPort() + path;
     }
 
     // ── Cache reload helper (called by controller after manual status change) ─

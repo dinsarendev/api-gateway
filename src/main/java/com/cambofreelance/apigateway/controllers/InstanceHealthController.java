@@ -5,9 +5,11 @@ import com.cambofreelance.apigateway.dto.ServiceNodeDto;
 import com.cambofreelance.apigateway.models.ServiceNode;
 import com.cambofreelance.apigateway.repositories.ServiceNodeRepository;
 import com.cambofreelance.apigateway.service.HealthCheckService;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -31,6 +33,15 @@ public class InstanceHealthController {
 
     private static final Set<String> VALID_HEALTH_STATUSES =
         Set.of("UP", "DOWN", "OUT_OF_SERVICE");
+
+    record InstanceRequest(
+        @JsonProperty("service_id")  String  serviceId,
+        String                               host,
+        Integer                              port,
+        Boolean                              secure,
+        Integer                              weight,
+        @JsonProperty("health_path") String  healthPath
+    ) {}
 
     private final ServiceNodeRepository serviceNodeRepository;
     private final HealthCheckService healthCheckService;
@@ -88,6 +99,64 @@ public class InstanceHealthController {
                     "instances", dtos
                 ));
             });
+    }
+
+    // ── POST /admin/health/instances ─────────────────────────────────────────
+
+    @PostMapping("/instances")
+    public Mono<ResponseEntity<ServiceNodeDto>> createInstance(@RequestBody InstanceRequest req) {
+        if (req.serviceId() == null || req.host() == null || req.port() == null) {
+            return Mono.just(ResponseEntity.<ServiceNodeDto>badRequest().build());
+        }
+        LocalDateTime now = LocalDateTime.now();
+        ServiceNode node = new ServiceNode();
+        node.setServiceId(req.serviceId().toUpperCase());
+        node.setHost(req.host());
+        node.setPort(req.port());
+        node.setSecure(Boolean.TRUE.equals(req.secure()));
+        node.setWeight(req.weight() != null ? req.weight() : 1);
+        node.setHealthPath(req.healthPath());
+        node.setHealthStatus("UP");
+        node.setStatus(Constants.STATUS_ACTIVE);
+        node.setCreatedAt(now);
+        node.setCreatedBy("admin");
+        return serviceNodeRepository.save(node)
+            .map(saved -> ResponseEntity.status(HttpStatus.CREATED).body(ServiceNodeDto.from(saved)))
+            .doOnSuccess(r -> healthCheckService.refreshCache().subscribe());
+    }
+
+    // ── PUT /admin/health/instances/{id} ─────────────────────────────────────
+
+    @PutMapping("/instances/{id}")
+    public Mono<ResponseEntity<ServiceNodeDto>> updateInstance(
+            @PathVariable Long id, @RequestBody InstanceRequest req) {
+        return serviceNodeRepository.findById(id)
+            .flatMap(existing -> serviceNodeRepository.updateInstance(
+                id,
+                req.serviceId()  != null ? req.serviceId().toUpperCase() : existing.getServiceId(),
+                req.host()       != null ? req.host()       : existing.getHost(),
+                req.port()       != null ? req.port()       : existing.getPort(),
+                req.secure()     != null ? req.secure()     : existing.isSecure(),
+                req.weight()     != null ? req.weight()     : existing.getWeight(),
+                req.healthPath() != null ? req.healthPath() : existing.getHealthPath(),
+                LocalDateTime.now(), "admin"
+            ))
+            .flatMap(rows -> rows > 0
+                ? serviceNodeRepository.findById(id).map(n -> ResponseEntity.ok(ServiceNodeDto.from(n)))
+                : Mono.<ResponseEntity<ServiceNodeDto>>just(ResponseEntity.<ServiceNodeDto>notFound().build()))
+            .defaultIfEmpty(ResponseEntity.<ServiceNodeDto>notFound().build())
+            .doOnSuccess(r -> healthCheckService.refreshCache().subscribe());
+    }
+
+    // ── DELETE /admin/health/instances/{id} ───────────────────────────────────
+
+    @DeleteMapping("/instances/{id}")
+    public Mono<ResponseEntity<Void>> deleteInstance(@PathVariable Long id) {
+        LocalDateTime now = LocalDateTime.now();
+        return serviceNodeRepository.softDelete(id, now, "admin")
+            .flatMap(rows -> rows > 0
+                ? healthCheckService.refreshCache().thenReturn(ResponseEntity.<Void>noContent().build())
+                : Mono.<ResponseEntity<Void>>just(ResponseEntity.notFound().build()));
     }
 
     // ── PUT /admin/health/instances/{id}/status ───────────────────────────────

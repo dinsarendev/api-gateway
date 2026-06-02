@@ -57,8 +57,11 @@ export const API = {
   updateGroup:  (id, data) => put(`/admin/groups/${id}`, data),
   deleteGroup:  (id)       => del(`/admin/groups/${id}`),
 
-  // ── Health ────────────────────────────────────────────────────────────────
+  // ── Health / Service Registry ─────────────────────────────────────────────
   getInstances:         (svcId = '') => get(`/admin/health/instances${svcId ? '?serviceId=' + svcId : ''}`),
+  createInstance:       (data)       => post('/admin/health/instances', data),
+  updateInstance:       (id, data)   => put(`/admin/health/instances/${id}`, data),
+  deleteInstance:       (id)         => del(`/admin/health/instances/${id}`),
   triggerCheck:         ()           => post('/admin/health/check'),
   updateInstanceStatus: (id, status) => put(`/admin/health/instances/${id}/status`, { healthStatus: status }),
 

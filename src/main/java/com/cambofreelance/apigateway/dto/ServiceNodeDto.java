@@ -19,6 +19,7 @@ public class ServiceNodeDto {
     private boolean secure;
     private Integer weight;
     private String healthStatus;
+    private String healthPath;
     private String baseUrl;
     private LocalDateTime lastHealthCheck;
     private String status;
@@ -32,6 +33,7 @@ public class ServiceNodeDto {
         dto.secure          = node.isSecure();
         dto.weight          = node.getWeight();
         dto.healthStatus    = node.getHealthStatus();
+        dto.healthPath      = node.getHealthPath();
         dto.lastHealthCheck = node.getLastHealthCheck();
         dto.status          = node.getStatus();
         dto.baseUrl         = (node.isSecure() ? "https" : "http") + "://" + node.getHost() + ":" + node.getPort();

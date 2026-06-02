@@ -27,6 +27,10 @@ CREATE TABLE public.service_instance (
     CONSTRAINT service_instance_pkey PRIMARY KEY (id)
 );
 
+-- health_path: custom probe endpoint per instance; NULL = skip probe (always UP)
+ALTER TABLE public.service_instance
+    ADD COLUMN IF NOT EXISTS health_path varchar(255) NULL DEFAULT '/actuator/health';
+
 CREATE INDEX idx_service_instance_service_id   ON public.service_instance (service_id);
 CREATE INDEX idx_service_instance_status       ON public.service_instance (status);
 CREATE INDEX idx_service_instance_health       ON public.service_instance (health_status);
