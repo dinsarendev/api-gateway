@@ -14,7 +14,11 @@ import java.time.LocalDateTime;
 public interface ApiRouteRepository extends R2dbcRepository<ApiRoute, Long> {
 
     @Query("""
-        SELECT a.*, g.uri AS uri
+        SELECT a.*,
+               CASE WHEN g.active_slot = 'GREEN' AND g.green_uri IS NOT NULL AND g.green_uri <> ''
+                    THEN g.green_uri
+                    ELSE COALESCE(g.blue_uri, g.uri)
+               END AS uri
           FROM public.api_route a
           INNER JOIN public.api_group_route g ON g.code = a.group_code
           WHERE a.path = :path AND a.method = :method AND a.status = 'ACT'
@@ -22,7 +26,11 @@ public interface ApiRouteRepository extends R2dbcRepository<ApiRoute, Long> {
     Mono<ApiRoute> findFirstByPathAndMethod(String path, String method);
 
     @Query("""
-        SELECT a.*, g.uri AS uri
+        SELECT a.*,
+               CASE WHEN g.active_slot = 'GREEN' AND g.green_uri IS NOT NULL AND g.green_uri <> ''
+                    THEN g.green_uri
+                    ELSE COALESCE(g.blue_uri, g.uri)
+               END AS uri
           FROM public.api_route a
           LEFT JOIN public.api_group_route g ON g.code = a.group_code
           WHERE a.status = :status
@@ -31,7 +39,11 @@ public interface ApiRouteRepository extends R2dbcRepository<ApiRoute, Long> {
     Flux<ApiRoute> findAllByStatus(String status);
 
     @Query("""
-        SELECT a.*, g.uri AS uri
+        SELECT a.*,
+               CASE WHEN g.active_slot = 'GREEN' AND g.green_uri IS NOT NULL AND g.green_uri <> ''
+                    THEN g.green_uri
+                    ELSE COALESCE(g.blue_uri, g.uri)
+               END AS uri
           FROM public.api_route a
           LEFT JOIN public.api_group_route g ON g.code = a.group_code
           WHERE a.id = :id
@@ -63,6 +75,9 @@ public interface ApiRouteRepository extends R2dbcRepository<ApiRoute, Long> {
                required_roles         = :requiredRoles,
                required_permissions   = :requiredPermissions,
                api_type               = :apiType,
+               version                = :version,
+               deprecated             = :deprecated,
+               sunset_date            = :sunsetDate,
                updated_at             = :updatedAt,
                updated_by             = :updatedBy
          WHERE id = :id
@@ -75,6 +90,7 @@ public interface ApiRouteRepository extends R2dbcRepository<ApiRoute, Long> {
                               Integer priority, LocalDateTime startTime, LocalDateTime endTime,
                               String authType, String requiredRoles, String requiredPermissions,
                               String apiType,
+                              String version, String deprecated, LocalDateTime sunsetDate,
                               LocalDateTime updatedAt, String updatedBy);
 
     @Modifying

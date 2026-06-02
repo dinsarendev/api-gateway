@@ -5,6 +5,8 @@ import com.cambofreelance.apigateway.constants.Constants;
 import com.cambofreelance.apigateway.constants.Permissions;
 import com.cambofreelance.apigateway.models.ApiGroupRoute;
 import com.cambofreelance.apigateway.repositories.ApiGroupRouteRepository;
+import com.cambofreelance.apigateway.service.impl.GatewayRouteService;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -29,7 +31,21 @@ import java.util.Map;
 public class AdminGroupController {
 
     private final ApiGroupRouteRepository groupRouteRepository;
+    private final GatewayRouteService gatewayRouteService;
     private final AdminAuthHelper adminAuth;
+
+    record BlueGreenConfig(
+        @JsonProperty("blue_uri")  String blueUri,
+        @JsonProperty("green_uri") String greenUri
+    ) {}
+
+    record BlueGreenStatus(
+        String code,
+        @JsonProperty("blue_uri")    String blueUri,
+        @JsonProperty("green_uri")   String greenUri,
+        @JsonProperty("active_slot") String activeSlot,
+        @JsonProperty("live_uri")    String liveUri
+    ) {}
 
     // ── List ──────────────────────────────────────────────────────────────────
 
@@ -103,5 +119,56 @@ public class AdminGroupController {
                 })
                 .thenReturn(ResponseEntity.ok(Map.<String, Object>of(
                     "id", id, "message", "Service group deleted"))));
+    }
+
+    // ── Blue-Green ────────────────────────────────────────────────────────────
+
+    @GetMapping("/{code}/blue-green")
+    public Mono<ResponseEntity<BlueGreenStatus>> blueGreenStatus(
+            @PathVariable String code, ServerWebExchange exchange) {
+        return adminAuth.require(exchange, Permissions.GROUP_READ)
+            .then(groupRouteRepository.findByCode(code)
+                .map(g -> ResponseEntity.ok(new BlueGreenStatus(
+                    g.getCode(), g.getBlueUri(), g.getGreenUri(),
+                    g.getActiveSlot() != null ? g.getActiveSlot() : "BLUE",
+                    g.resolvedUri())))
+                .defaultIfEmpty(ResponseEntity.<BlueGreenStatus>notFound().build()));
+    }
+
+    @PutMapping("/{code}/blue-green")
+    public Mono<ResponseEntity<BlueGreenStatus>> configureBlueGreen(
+            @PathVariable String code, @RequestBody BlueGreenConfig req, ServerWebExchange exchange) {
+        return adminAuth.require(exchange, Permissions.GROUP_WRITE)
+            .then(groupRouteRepository.configureSlots(
+                    code, req.blueUri(), req.greenUri(),
+                    LocalDateTime.now(), adminAuth.currentUser(exchange))
+                .filter(rows -> rows > 0)
+                .switchIfEmpty(Mono.error(new RuntimeException("Group not found: " + code)))
+                .flatMap(r -> groupRouteRepository.findByCode(code))
+                .map(g -> {
+                    gatewayRouteService.refreshRoutes();
+                    return ResponseEntity.ok(new BlueGreenStatus(
+                        g.getCode(), g.getBlueUri(), g.getGreenUri(),
+                        g.getActiveSlot() != null ? g.getActiveSlot() : "BLUE",
+                        g.resolvedUri()));
+                }));
+    }
+
+    @PostMapping("/{code}/swap")
+    public Mono<ResponseEntity<BlueGreenStatus>> swapSlot(
+            @PathVariable String code, ServerWebExchange exchange) {
+        return adminAuth.require(exchange, Permissions.GROUP_WRITE)
+            .then(groupRouteRepository.swapSlot(
+                    code, LocalDateTime.now(), adminAuth.currentUser(exchange))
+                .filter(rows -> rows > 0)
+                .switchIfEmpty(Mono.error(new RuntimeException("Group not found: " + code)))
+                .flatMap(r -> groupRouteRepository.findByCode(code))
+                .map(g -> {
+                    gatewayRouteService.refreshRoutes();
+                    return ResponseEntity.ok(new BlueGreenStatus(
+                        g.getCode(), g.getBlueUri(), g.getGreenUri(),
+                        g.getActiveSlot(),
+                        g.resolvedUri()));
+                }));
     }
 }

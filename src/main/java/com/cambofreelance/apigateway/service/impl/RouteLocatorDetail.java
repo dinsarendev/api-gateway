@@ -1,6 +1,8 @@
 package com.cambofreelance.apigateway.service.impl;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import com.cambofreelance.apigateway.configs.DecryptRequestBodyFilter;
 import com.cambofreelance.apigateway.configs.EncryptResponseBodyFilter;
@@ -81,6 +83,15 @@ public class RouteLocatorDetail implements RouteLocator {
                             c.setName(apiRoute.getGroupCode() + "-breaker");
                             c.setFallbackUri("forward:/fallback/" + apiRoute.getGroupCode());
                         });
+                    }
+                    if (Constants.YES.equalsIgnoreCase(apiRoute.getDeprecated())) {
+                        f.addResponseHeader("Deprecation", "true");
+                        if (apiRoute.getSunsetDate() != null) {
+                            String sunset = apiRoute.getSunsetDate()
+                                .atOffset(ZoneOffset.UTC)
+                                .format(DateTimeFormatter.RFC_1123_DATE_TIME);
+                            f.addResponseHeader("Sunset", sunset);
+                        }
                     }
                     applyApiTypeFilters(f, apiType);
                     return f;

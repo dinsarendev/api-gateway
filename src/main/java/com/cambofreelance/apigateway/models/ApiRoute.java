@@ -84,4 +84,13 @@ public class ApiRoute extends BaseEntity implements Serializable {
 
     @Column("api_type")
     private String apiType;
+
+    @Column("version")
+    private String version;
+
+    @Column("deprecated")
+    private String deprecated;
+
+    @Column("sunset_date")
+    private LocalDateTime sunsetDate;
 }

@@ -57,6 +57,11 @@ export const API = {
   updateGroup:  (id, data) => put(`/admin/groups/${id}`, data),
   deleteGroup:  (id)       => del(`/admin/groups/${id}`),
 
+  // ── Blue-Green deployment ─────────────────────────────────────────────────
+  getBlueGreen:       (code)       => get(`/admin/groups/${code}/blue-green`),
+  configureBlueGreen: (code, data) => put(`/admin/groups/${code}/blue-green`, data),
+  swapSlot:           (code)       => post(`/admin/groups/${code}/swap`),
+
   // ── Health / Service Registry ─────────────────────────────────────────────
   getInstances:         (svcId = '') => get(`/admin/health/instances${svcId ? '?serviceId=' + svcId : ''}`),
   createInstance:       (data)       => post('/admin/health/instances', data),

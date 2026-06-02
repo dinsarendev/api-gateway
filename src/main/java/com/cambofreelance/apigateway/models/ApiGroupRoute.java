@@ -9,6 +9,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
 @Getter
@@ -28,4 +29,20 @@ public class ApiGroupRoute extends BaseEntity implements Serializable {
     private String code;
     private String uri;
     private String status;
+
+    @Column("blue_uri")
+    private String blueUri;
+
+    @Column("green_uri")
+    private String greenUri;
+
+    @Column("active_slot")
+    private String activeSlot;
+
+    public String resolvedUri() {
+        if ("GREEN".equalsIgnoreCase(activeSlot) && greenUri != null && !greenUri.isBlank()) {
+            return greenUri;
+        }
+        return blueUri != null && !blueUri.isBlank() ? blueUri : uri;
+    }
 }

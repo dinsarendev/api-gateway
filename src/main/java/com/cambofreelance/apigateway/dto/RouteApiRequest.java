@@ -21,6 +21,9 @@ public record RouteApiRequest(
     @JsonProperty("auth_type")             String authType,
     @JsonProperty("required_roles")        String requiredRoles,
     @JsonProperty("required_permissions")  String requiredPermissions,
-    @JsonProperty("api_type")              String apiType
+    @JsonProperty("api_type")              String apiType,
+    String                                 version,
+    String                                 deprecated,
+    @JsonProperty("sunset_date")           LocalDateTime sunsetDate
 ) {}
 

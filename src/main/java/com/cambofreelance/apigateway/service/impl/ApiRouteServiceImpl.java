@@ -47,14 +47,16 @@ public class ApiRouteServiceImpl implements ApiRouteService {
                      rate_limit, rate_limit_duration, priority,
                      start_time, end_time,
                      auth_type, required_roles, required_permissions,
-                     api_type, status, created_at, created_by)
+                     api_type, version, deprecated, sunset_date,
+                     status, created_at, created_by)
                 VALUES
                     (:groupCode, :path, :method, :description, :applicationId,
                      :isPublic, :isEncrypt, :enableCircuitBreaker,
                      :rateLimit, :rateLimitDuration, :priority,
                      :startTime, :endTime,
                      :authType, :requiredRoles, :requiredPermissions,
-                     :apiType, 'ACT', NOW(), :createdBy)
+                     :apiType, :version, :deprecated, :sunsetDate,
+                     'ACT', NOW(), :createdBy)
                 RETURNING id
                 """)
             .bind("groupCode",            orEmpty(req.groupCode()))
@@ -74,6 +76,9 @@ public class ApiRouteServiceImpl implements ApiRouteService {
             .bind("requiredRoles",        req.requiredRoles() != null ? req.requiredRoles() : Parameters.in(String.class))
             .bind("requiredPermissions",  req.requiredPermissions() != null ? req.requiredPermissions() : Parameters.in(String.class))
             .bind("apiType",              req.apiType() != null ? req.apiType().toUpperCase() : Constants.API_TYPE_REST)
+            .bind("version",              req.version() != null ? req.version() : Parameters.in(String.class))
+            .bind("deprecated",           orEmpty(req.deprecated(), "N"))
+            .bind("sunsetDate",           req.sunsetDate() != null ? req.sunsetDate() : Parameters.in(LocalDateTime.class))
             .bind("createdBy",            ADMIN)
             .map(row -> row.get("id", Long.class))
             .first()
@@ -111,6 +116,9 @@ public class ApiRouteServiceImpl implements ApiRouteService {
                 req.requiredRoles()        != null ? req.requiredRoles()        : existing.getRequiredRoles(),
                 req.requiredPermissions()  != null ? req.requiredPermissions()  : existing.getRequiredPermissions(),
                 req.apiType()              != null ? req.apiType().toUpperCase() : existing.getApiType(),
+                req.version()              != null ? req.version()              : existing.getVersion(),
+                orEmpty(req.deprecated(),           existing.getDeprecated()),
+                req.sunsetDate()           != null ? req.sunsetDate()           : existing.getSunsetDate(),
                 LocalDateTime.now(), ADMIN
             ))
             .filter(rows -> rows > 0)
@@ -198,7 +206,8 @@ public class ApiRouteServiceImpl implements ApiRouteService {
             r.getStatus(), r.getCreatedBy(), r.getCreatedAt(),
             r.getUpdatedBy(), r.getUpdatedAt(),
             r.getAuthType(), r.getRequiredRoles(), r.getRequiredPermissions(),
-            r.getApiType()
+            r.getApiType(),
+            r.getVersion(), r.getDeprecated(), r.getSunsetDate()
         );
     }
 

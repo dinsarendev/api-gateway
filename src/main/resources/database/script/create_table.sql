@@ -68,6 +68,29 @@ ALTER TABLE public.api_route
 
 COMMENT ON COLUMN public.api_route.api_type IS 'REST | SOAP | GRAPHQL | STREAMING | AI';
 
+-- ── Route versioning & deprecation ────────────────────────────────────────────
+ALTER TABLE public.api_route
+    ADD COLUMN IF NOT EXISTS version    varchar(20)  NULL,
+    ADD COLUMN IF NOT EXISTS deprecated varchar(1)   NOT NULL DEFAULT 'N',
+    ADD COLUMN IF NOT EXISTS sunset_date timestamp   NULL;
+
+COMMENT ON COLUMN public.api_route.version     IS 'API version tag e.g. v1, v2, v3';
+COMMENT ON COLUMN public.api_route.deprecated  IS 'Y = inject Deprecation + Sunset headers';
+COMMENT ON COLUMN public.api_route.sunset_date IS 'Date after which the route will be retired (used in Sunset header)';
+
+-- ── Blue-Green deployment support on api_group_route ─────────────────────────
+ALTER TABLE public.api_group_route
+    ADD COLUMN IF NOT EXISTS blue_uri    varchar(255) NULL,
+    ADD COLUMN IF NOT EXISTS green_uri   varchar(255) NULL,
+    ADD COLUMN IF NOT EXISTS active_slot varchar(5)   NOT NULL DEFAULT 'BLUE';
+
+-- Seed blue_uri from the existing uri column for all groups that have one
+UPDATE public.api_group_route SET blue_uri = uri WHERE blue_uri IS NULL AND uri IS NOT NULL;
+
+COMMENT ON COLUMN public.api_group_route.blue_uri    IS 'Blue slot backend URI (stable)';
+COMMENT ON COLUMN public.api_group_route.green_uri   IS 'Green slot backend URI (new version)';
+COMMENT ON COLUMN public.api_group_route.active_slot IS 'BLUE | GREEN — which slot receives live traffic';
+
 -- ── Security tables ────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS public.ip_access_control (

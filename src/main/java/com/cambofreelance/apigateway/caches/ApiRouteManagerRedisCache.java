@@ -24,8 +24,8 @@ public class ApiRouteManagerRedisCache {
 
     private HashOperations<String, String, ApiRouteDto> hashOperations;
 
-    @Resource
-    private RedisTemplate<String, Object> redisTemplate;
+    @Resource(name = "apiRouteDtoRedisTemplate")
+    private RedisTemplate<String, ApiRouteDto> redisTemplate;
 
     @PostConstruct
     public void init() {
