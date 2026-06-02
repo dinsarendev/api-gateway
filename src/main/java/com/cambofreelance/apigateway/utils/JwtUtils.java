@@ -38,9 +38,14 @@ public class JwtUtils {
     // ── Token generation ──────────────────────────────────────────────────────
 
     public String generateAdminToken(String username, List<String> roles) {
+        return generateAdminToken(username, roles, List.of());
+    }
+
+    public String generateAdminToken(String username, List<String> roles, List<String> permissions) {
         Map<String, Object> claims = new HashMap<>();
-        claims.put("roles", roles);
-        claims.put("admin", true);
+        claims.put("roles",       roles);
+        claims.put("permissions", permissions);
+        claims.put("admin",       true);
         return Jwts.builder()
             .setClaims(claims)
             .setSubject(username)

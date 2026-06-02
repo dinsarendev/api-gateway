@@ -14,6 +14,7 @@ import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -55,8 +56,15 @@ public class AdminAuthWebFilter implements WebFilter {
             return deny(exchange, "Invalid or expired admin token");
         }
 
-        // Propagate username downstream for audit use
-        String username = jwtUtils.getUserIdFromJwtToken(token);
+        // Store principal attributes so controllers can check permissions reactively
+        String username    = jwtUtils.getUserIdFromJwtToken(token);
+        List<String> roles = jwtUtils.getRolesFromToken(token);
+        List<String> perms = jwtUtils.getPermissionsFromToken(token);
+
+        exchange.getAttributes().put("adminUser",        username);
+        exchange.getAttributes().put("adminRoles",       roles);
+        exchange.getAttributes().put("adminPermissions", perms);
+
         ServerWebExchange mutated = exchange.mutate()
             .request(exchange.getRequest().mutate()
                 .header("X-Admin-User", username)
