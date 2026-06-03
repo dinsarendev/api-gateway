@@ -27,6 +27,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.Objects;
 import java.util.Optional;
@@ -84,6 +85,12 @@ public class RequestLoggingFilter implements GlobalFilter {
             routeDto = ApiRouteManagerCache.get(path, method);
         }
         if (routeDto == null) {
+            return errorResponse(exchange, HttpStatus.NOT_FOUND, ErrorCode.ERR_00404, "API route not found")
+                .doFinally(s -> metricsCollector.record(null, 404, elapsedMs(startNano), clientIp));
+        }
+
+        // Enforce time-window scheduling: reject requests outside [startTime, endTime]
+        if (!isRouteAvailableNow(routeDto)) {
             return errorResponse(exchange, HttpStatus.NOT_FOUND, ErrorCode.ERR_00404, "API route not found")
                 .doFinally(s -> metricsCollector.record(null, 404, elapsedMs(startNano), clientIp));
         }
@@ -230,6 +237,12 @@ public class RequestLoggingFilter implements GlobalFilter {
             response.setStatusCode(HttpStatus.INTERNAL_SERVER_ERROR);
             return response.setComplete();
         }
+    }
+
+    private boolean isRouteAvailableNow(ApiRouteDto route) {
+        LocalDateTime now = LocalDateTime.now();
+        return (route.getStartTime() == null || !now.isBefore(route.getStartTime())) &&
+               (route.getEndTime()   == null || !now.isAfter(route.getEndTime()));
     }
 
     private String getTraceId() {

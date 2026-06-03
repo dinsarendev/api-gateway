@@ -11,6 +11,7 @@ import com.cambofreelance.apigateway.repositories.ApiRouteRepository;
 import com.cambofreelance.apigateway.service.ApiRouteService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.r2dbc.core.DatabaseClient;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -40,6 +41,28 @@ public class ApiRouteServiceImpl implements ApiRouteService {
      */
     @Override
     public Mono<RouteApiResponse> create(RouteApiRequest req) {
+        if (StringUtils.isBlank(req.path())) {
+            return Mono.error(new RouteCreationException("path is required"));
+        }
+        if (StringUtils.isBlank(req.groupCode())) {
+            return Mono.error(new RouteCreationException("group_code is required"));
+        }
+
+        String normalizedMethod = StringUtils.isNotBlank(req.method()) ? req.method().toUpperCase() : "";
+
+        return apiRouteRepository
+            .countActiveByPathAndMethodExcluding(req.path(), normalizedMethod, -1L)
+            .flatMap(count -> {
+                if (count > 0) {
+                    String label = normalizedMethod.isEmpty() ? "*" : normalizedMethod;
+                    return Mono.error(new RouteCreationException(
+                        "Active route already exists for path=" + req.path() + " method=[" + label + "]"));
+                }
+                return doCreate(req, normalizedMethod);
+            });
+    }
+
+    private Mono<RouteApiResponse> doCreate(RouteApiRequest req, String normalizedMethod) {
         return databaseClient.sql("""
                 INSERT INTO api_route
                     (group_code, path, method, description, application_id,
@@ -61,7 +84,7 @@ public class ApiRouteServiceImpl implements ApiRouteService {
                 """)
             .bind("groupCode",            orEmpty(req.groupCode()))
             .bind("path",                 orEmpty(req.path()))
-            .bind("method",               orEmpty(req.method()).toUpperCase())
+            .bind("method",               normalizedMethod)
             .bind("description",          orEmpty(req.description()))
             .bind("applicationId",        orEmpty(req.applicationId()))
             .bind("isPublic",             orEmpty(req.isPublic(), "N"))
@@ -85,7 +108,7 @@ public class ApiRouteServiceImpl implements ApiRouteService {
             .flatMap(apiRouteRepository::findByIdWithUri)
             .map(this::toResponse)
             .doOnSuccess(r -> refreshAll())
-            .onErrorMap(e -> {
+            .onErrorMap(e -> !(e instanceof RouteCreationException), e -> {
                 log.error("Failed to create route: {}", e.getMessage());
                 return new RouteCreationException("Failed to create route: " + e.getMessage());
             });

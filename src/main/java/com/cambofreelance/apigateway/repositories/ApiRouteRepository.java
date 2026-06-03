@@ -55,6 +55,13 @@ public interface ApiRouteRepository extends R2dbcRepository<ApiRoute, Long> {
         """)
     Mono<Long> countByStatus(String status);
 
+    @Query("""
+        SELECT COUNT(*) FROM public.api_route
+         WHERE path = :path AND COALESCE(method, '') = COALESCE(:method, '')
+           AND status = 'ACT' AND id <> :excludeId
+        """)
+    Mono<Long> countActiveByPathAndMethodExcluding(String path, String method, Long excludeId);
+
     @Modifying
     @Query("""
         UPDATE public.api_route

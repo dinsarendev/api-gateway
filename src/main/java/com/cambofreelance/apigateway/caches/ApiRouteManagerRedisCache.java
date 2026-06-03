@@ -101,27 +101,27 @@ public class ApiRouteManagerRedisCache {
     // ================= GET =================
     public ApiRouteDto get(String path, String method) {
         try {
-            // 1. Exact match O(1)
+            // 1. Exact match for the specific method  O(1)
             ApiRouteDto exact = hashOperations.get(KEY, buildKey(path, method));
-            if (exact != null) {
-                return exact;
+            // 1b. Fallback: any-method route (blank method = matches all HTTP methods)
+            if (exact == null) {
+                exact = hashOperations.get(KEY, buildKey(path, ""));
             }
+            if (exact != null) return exact;
 
             // 2. Path variable match: /users/{id}, /items/{id}/details
             Map<String, ApiRouteDto> pathVars = hashOperations.entries(KEY + SUFFIX_PATH_VARS);
             ApiRouteDto pathVarMatch = pathVars.values().stream()
-                .filter(dto -> dto.getMethod().equalsIgnoreCase(method))
+                .filter(dto -> methodMatches(dto.getMethod(), method))
                 .filter(dto -> matchesPathVariable(dto.getPath(), path))
                 .max(Comparator.comparingInt(dto -> countLiteralSegments(dto.getPath())))
                 .orElse(null);
-            if (pathVarMatch != null) {
-                return pathVarMatch;
-            }
+            if (pathVarMatch != null) return pathVarMatch;
 
             // 3. Wildcard match: /api/**
             Map<String, ApiRouteDto> wildcards = hashOperations.entries(KEY + SUFFIX_WILDCARDS);
             return wildcards.values().stream()
-                .filter(dto -> dto.getMethod().equalsIgnoreCase(method))
+                .filter(dto -> methodMatches(dto.getMethod(), method))
                 .filter(dto -> matchesWildcard(dto.getPath(), path))
                 .max(Comparator.comparingInt(dto -> dto.getPath().length()))
                 .orElse(null);
@@ -134,8 +134,14 @@ public class ApiRouteManagerRedisCache {
 
     // ================= UTIL =================
 
+    /** Blank/null method = route accepts any HTTP method. */
+    private boolean methodMatches(String routeMethod, String incomingMethod) {
+        return routeMethod == null || routeMethod.isEmpty() || routeMethod.equalsIgnoreCase(incomingMethod);
+    }
+
+    /** Null-safe: a null/blank method produces a key ending with ":" */
     private String buildKey(String path, String method) {
-        return path + ":" + method.toUpperCase();
+        return path + ":" + (method != null ? method.toUpperCase() : "");
     }
 
     private boolean hasPathVariable(String path) {

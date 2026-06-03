@@ -7,79 +7,84 @@ import com.cambofreelance.apigateway.dto.ApiRouteDto;
 
 public class ApiRouteManagerCache {
 
-    // ================= CACHE =================
-    private static Map<String, ApiRouteDto> exactMap;
-    private static List<ApiRouteDto> pathVariableList;
-    private static List<ApiRouteDto> wildcardList;
-    private static Map<String, String> generalCaches;
+    // Volatile holder for atomic reload — swapped as a single reference so
+    // concurrent reads never see a half-built state.
+    private static volatile RouteHolder holder = RouteHolder.empty();
+
+    // General-purpose key-value store (unrelated to route reload lifecycle).
+    private static final Map<String, String> generalCaches = new ConcurrentHashMap<>();
+
+    private record RouteHolder(
+        Map<String, ApiRouteDto> exactMap,
+        List<ApiRouteDto> pathVariableList,
+        List<ApiRouteDto> wildcardList
+    ) {
+        static RouteHolder empty() {
+            return new RouteHolder(new ConcurrentHashMap<>(), List.of(), List.of());
+        }
+    }
 
     // ================= INIT =================
     public static void init(List<ApiRouteDto> routes) {
 
-        exactMap = new ConcurrentHashMap<>();
-        pathVariableList = new ArrayList<>();
-        wildcardList = new ArrayList<>();
-        generalCaches = new ConcurrentHashMap<>();
+        Map<String, ApiRouteDto> newExactMap       = new ConcurrentHashMap<>();
+        List<ApiRouteDto>        newPathVariables   = new ArrayList<>();
+        List<ApiRouteDto>        newWildcards       = new ArrayList<>();
 
-        if (routes == null || routes.isEmpty()) return;
+        if (routes != null) {
+            for (ApiRouteDto route : routes) {
+                String path = normalize(route.getPath());
+                route.setPath(path);
 
-        for (ApiRouteDto route : routes) {
-
-            String path = normalize(route.getPath());
-            route.setPath(path);
-
-            String key = buildKey(path, route.getMethod());
-
-            if (hasPathVariable(path)) {
-                // path variable route: /users/{id}, /users/{id}/posts/{postId}, /users/{id}/**
-                pathVariableList.add(route);
-
-            } else if (isWildcard(path)) {
-                // pure wildcard route: /api/**, /users/**
-                route.setPath(extractBasePath(path));
-                wildcardList.add(route);
-
-            } else {
-                exactMap.put(key, route);
+                if (hasPathVariable(path)) {
+                    newPathVariables.add(route);
+                } else if (isWildcard(path)) {
+                    route.setPath(extractBasePath(path));
+                    newWildcards.add(route);
+                } else {
+                    newExactMap.put(buildKey(path, route.getMethod()), route);
+                }
             }
+
+            // most specific match first (most literal segments wins)
+            newPathVariables.sort((a, b) ->
+                countLiteralSegments(b.getPath()) - countLiteralSegments(a.getPath())
+            );
+            // longest prefix first
+            newWildcards.sort((a, b) ->
+                b.getPath().length() - a.getPath().length()
+            );
         }
 
-        // sort path variable routes: most literal segments first (most specific match wins)
-        pathVariableList.sort((a, b) ->
-            countLiteralSegments(b.getPath()) - countLiteralSegments(a.getPath())
-        );
-
-        // sort wildcard routes: longest prefix first
-        wildcardList.sort((a, b) ->
-            b.getPath().length() - a.getPath().length()
-        );
+        // Atomic swap — readers always see a consistent snapshot
+        holder = new RouteHolder(newExactMap,
+                                  Collections.unmodifiableList(newPathVariables),
+                                  Collections.unmodifiableList(newWildcards));
     }
 
     // ================= GET =================
     public static ApiRouteDto get(String path, String method) {
 
-        if (exactMap == null) return null;
-
+        RouteHolder rd = holder;
         String normalizedPath = normalize(path);
-        String key = buildKey(normalizedPath, method);
 
-        // 1. Exact match O(1)
-        ApiRouteDto exact = exactMap.get(key);
-        if (exact != null) {
-            return exact;
+        // 1. Exact match for the specific method  O(1)
+        ApiRouteDto exact = rd.exactMap.get(buildKey(normalizedPath, method));
+        // 1b. Fallback: any-method route (blank method = matches all HTTP methods)
+        if (exact == null) {
+            exact = rd.exactMap.get(buildKey(normalizedPath, ""));
         }
+        if (exact != null) return exact;
 
-        // 2. Path variable match: /users/{id}, /items/{id}/details
-        for (ApiRouteDto dto : pathVariableList) {
-            if (!dto.getMethod().equalsIgnoreCase(method)) continue;
-            if (matchesPathVariable(dto.getPath(), normalizedPath)) {
-                return dto;
-            }
+        // 2. Path-variable match: /users/{id}, /items/{id}/details
+        for (ApiRouteDto dto : rd.pathVariableList) {
+            if (!methodMatches(dto.getMethod(), method)) continue;
+            if (matchesPathVariable(dto.getPath(), normalizedPath)) return dto;
         }
 
         // 3. Wildcard match: /api/**
-        for (ApiRouteDto dto : wildcardList) {
-            if (!dto.getMethod().equalsIgnoreCase(method)) continue;
+        for (ApiRouteDto dto : rd.wildcardList) {
+            if (!methodMatches(dto.getMethod(), method)) continue;
             if (normalizedPath.equals(dto.getPath()) || normalizedPath.startsWith(dto.getPath() + "/")) {
                 return dto;
             }
@@ -92,10 +97,11 @@ public class ApiRouteManagerCache {
 
     /** Returns every cached route across all three buckets. */
     public static List<ApiRouteDto> getAllRoutes() {
+        RouteHolder rd = holder;
         List<ApiRouteDto> all = new ArrayList<>();
-        if (exactMap != null)        all.addAll(exactMap.values());
-        if (pathVariableList != null) all.addAll(pathVariableList);
-        if (wildcardList != null)     all.addAll(wildcardList);
+        all.addAll(rd.exactMap.values());
+        all.addAll(rd.pathVariableList);
+        all.addAll(rd.wildcardList);
         return all;
     }
 
@@ -117,6 +123,15 @@ public class ApiRouteManagerCache {
     }
 
     // ================= UTIL =================
+
+    /**
+     * Returns true when the route's stored method either matches the incoming
+     * method or is blank/null (meaning the route accepts any HTTP method).
+     */
+    private static boolean methodMatches(String routeMethod, String incomingMethod) {
+        return routeMethod == null || routeMethod.isEmpty() || routeMethod.equalsIgnoreCase(incomingMethod);
+    }
+
     private static boolean hasPathVariable(String path) {
         return path != null && path.contains("{");
     }
@@ -129,8 +144,9 @@ public class ApiRouteManagerCache {
         return path.substring(0, path.length() - 3);
     }
 
+    /** Null-safe: a null/blank method produces a key ending with ":" */
     private static String buildKey(String path, String method) {
-        return path + ":" + method.toUpperCase();
+        return path + ":" + (method != null ? method.toUpperCase() : "");
     }
 
     private static String normalize(String path) {
@@ -142,15 +158,9 @@ public class ApiRouteManagerCache {
     }
 
     /**
-     * Matches a request path against a path variable pattern.
-     * Segments wrapped in {curly braces} match any single path segment.
+     * Matches a request path against a path-variable pattern.
+     * Segments in {curly braces} match any single segment.
      * A ** segment matches all remaining segments.
-     *
-     * Examples:
-     *   /users/{id}            vs /users/123          → true
-     *   /users/{id}/posts      vs /users/123/posts     → true
-     *   /users/{id}/posts/**   vs /users/123/posts/1   → true
-     *   /users/{id}            vs /users/123/extra     → false
      */
     private static boolean matchesPathVariable(String pattern, String requestPath) {
         String[] patternSegs = pattern.split("/", -1);
@@ -170,9 +180,7 @@ public class ApiRouteManagerCache {
     private static int countLiteralSegments(String path) {
         int count = 0;
         for (String seg : path.split("/", -1)) {
-            if (!seg.isEmpty() && !seg.startsWith("{") && !"**".equals(seg)) {
-                count++;
-            }
+            if (!seg.isEmpty() && !seg.startsWith("{") && !"**".equals(seg)) count++;
         }
         return count;
     }
