@@ -17,6 +17,7 @@ import Users           from './pages/Users';
 import Roles           from './pages/Roles';
 import Incidents       from './pages/Incidents';
 import Monitoring      from './pages/Monitoring';
+import AuditLogs       from './pages/AuditLogs';
 import Profile         from './pages/Profile';
 import Login           from './pages/Login';
 import { auth } from './auth';
@@ -34,6 +35,7 @@ const TITLES = {
   '/security/oauth2':   'OAuth2 Providers',
   '/users':             'User Management',
   '/roles':             'Role Management',
+  '/audit-logs':        'Audit Logs',
   '/profile':           'My Profile',
 };
 
@@ -102,6 +104,7 @@ function Layout({ sidebarOpen, setSidebarOpen }) {
             <Route path="/security/oauth2"   element={<OAuth2Providers />} />
             <Route path="/users"             element={<Users />} />
             <Route path="/roles"             element={<Roles />} />
+            <Route path="/audit-logs"        element={<AuditLogs />} />
             <Route path="/profile"           element={<Profile />} />
             <Route path="*"                  element={<Navigate to="/" replace />} />
           </Routes>

@@ -58,10 +58,12 @@ public class AdminAuthWebFilter implements WebFilter {
 
         // Store principal attributes so controllers can check permissions reactively
         String username    = jwtUtils.getUserIdFromJwtToken(token);
+        Long   userId      = jwtUtils.getUserNumericIdFromToken(token);
         List<String> roles = jwtUtils.getRolesFromToken(token);
         List<String> perms = jwtUtils.getPermissionsFromToken(token);
 
         exchange.getAttributes().put("adminUser",        username);
+        exchange.getAttributes().put("adminUserId",      userId);
         exchange.getAttributes().put("adminRoles",       roles);
         exchange.getAttributes().put("adminPermissions", perms);
 

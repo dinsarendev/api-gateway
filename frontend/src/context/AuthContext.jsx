@@ -21,6 +21,7 @@ export const PERMS = {
   MONITORING_READ: 'MONITORING_READ',
   INCIDENT_READ:   'INCIDENT_READ',
   INCIDENT_WRITE:  'INCIDENT_WRITE',
+  AUDIT_LOG_READ:  'AUDIT_LOG_READ',
 };
 
 export function AuthProvider({ children }) {

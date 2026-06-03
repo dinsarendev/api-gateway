@@ -100,6 +100,12 @@ export const API = {
   getApiMetrics:      (window = 1, limit = 10) => get(`/admin/metrics/apis?window=${window}&limit=${limit}`),
   getConsumerMetrics: (window = 1, limit = 10) => get(`/admin/metrics/consumers?window=${window}&limit=${limit}`),
 
+  // ── Audit Logs ────────────────────────────────────────────────────────────
+  getAuditLogs: (params = {}) => {
+    const q = new URLSearchParams({ page: 0, size: 20, ...params }).toString();
+    return get(`/admin/audit-logs?${q}`);
+  },
+
   // ── Roles ─────────────────────────────────────────────────────────────────
   getRoles:       (params = {}) => {
     const q = new URLSearchParams({ status: 'ACT', search: '', page: 0, size: 15, ...params }).toString();

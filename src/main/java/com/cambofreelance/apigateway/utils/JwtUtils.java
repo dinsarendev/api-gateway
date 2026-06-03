@@ -38,14 +38,19 @@ public class JwtUtils {
     // ── Token generation ──────────────────────────────────────────────────────
 
     public String generateAdminToken(String username, List<String> roles) {
-        return generateAdminToken(username, roles, List.of());
+        return generateAdminToken(username, null, roles, List.of());
     }
 
     public String generateAdminToken(String username, List<String> roles, List<String> permissions) {
+        return generateAdminToken(username, null, roles, permissions);
+    }
+
+    public String generateAdminToken(String username, Long userId, List<String> roles, List<String> permissions) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("roles",       roles);
         claims.put("permissions", permissions);
         claims.put("admin",       true);
+        if (userId != null) claims.put("userId", userId);
         return Jwts.builder()
             .setClaims(claims)
             .setSubject(username)
@@ -64,6 +69,14 @@ public class JwtUtils {
             log.error("Error while parsing JWT token: {}", e.getMessage());
             return "";
         }
+    }
+
+    public Long getUserNumericIdFromToken(String token) {
+        try {
+            Object val = parseClaims(token).get("userId");
+            if (val instanceof Number n) return n.longValue();
+        } catch (Throwable ignored) {}
+        return null;
     }
 
     public String getDataTokenAndKey(String token, String key) {

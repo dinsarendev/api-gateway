@@ -51,7 +51,7 @@ public class AdminAuthService {
                         .map(p -> p.getName())
                         .collectList()
                         .flatMap(perms -> {
-                            String accessToken = jwtUtils.generateAdminToken(user.getUsername(), roles, perms);
+                            String accessToken = jwtUtils.generateAdminToken(user.getUsername(), user.getId(), roles, perms);
                             String rawRefresh  = newRefreshToken();
                             AdminRefreshToken rt = AdminRefreshToken.builder()
                                 .userId(user.getId())
@@ -88,7 +88,7 @@ public class AdminAuthService {
                                 .map(p -> p.getName())
                                 .collectList()
                                 .flatMap(perms -> {
-                                    String newAccess     = jwtUtils.generateAdminToken(user.getUsername(), roles, perms);
+                                    String newAccess     = jwtUtils.generateAdminToken(user.getUsername(), user.getId(), roles, perms);
                                     String rawNewRefresh = newRefreshToken();
                                     AdminRefreshToken newRt = AdminRefreshToken.builder()
                                         .userId(user.getId())

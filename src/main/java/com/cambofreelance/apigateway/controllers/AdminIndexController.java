@@ -23,6 +23,7 @@ public class AdminIndexController {
         "/incidents", "/monitoring",
         "/security/api-keys", "/security/ip-acl", "/security/oauth2",
         "/users", "/roles", "/profile",
+        "/audit-logs",
     }, produces = MediaType.TEXT_HTML_VALUE)
     public Mono<Resource> spa() {
         return Mono.just(INDEX);

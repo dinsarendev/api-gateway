@@ -116,12 +116,17 @@ export default function Sidebar({ isOpen, onClose }) {
         </>
       )}
 
+      {(can(PERMS.USER_READ) || can(PERMS.AUDIT_LOG_READ)) && (
+        <div className="sidebar-section">ADMINISTRATION</div>
+      )}
       {can(PERMS.USER_READ) && (
         <>
-          <div className="sidebar-section">ADMINISTRATION</div>
           <NavItem to="/users" icon="fa-users"       label="Users" onClick={onClose} />
           <NavItem to="/roles" icon="fa-user-shield" label="Roles" onClick={onClose} />
         </>
+      )}
+      {can(PERMS.AUDIT_LOG_READ) && (
+        <NavItem to="/audit-logs" icon="fa-clipboard-list" label="Audit Logs" onClick={onClose} />
       )}
 
       {/* Logout — pinned to bottom */}
