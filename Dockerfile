@@ -13,7 +13,7 @@ ENV TZ=Asia/Phnom_Penh
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && \
     echo $TZ > /etc/timezone
 
-RUN gradle bootJar --no-daemon
+RUN gradle bootJar --no-daemon -x npmInstall -x npmBuild
 
 FROM nexus.cambofreelance.com/docker-hosted/core/eclipse-temurin:21-jdk-alpine
 
