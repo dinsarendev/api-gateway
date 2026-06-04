@@ -39,7 +39,7 @@ const TITLES = {
   '/profile':           'My Profile',
 };
 
-function Layout({ sidebarOpen, setSidebarOpen }) {
+function Layout({ sidebarOpen, setSidebarOpen, sidebarCollapsed, setSidebarCollapsed }) {
   const { pathname } = useLocation();
   const { theme, toggle: toggleTheme } = useTheme();
   const reload = () => window.location.reload();
@@ -57,12 +57,20 @@ function Layout({ sidebarOpen, setSidebarOpen }) {
         onClick={() => setSidebarOpen(false)}
       />
 
-      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar isOpen={sidebarOpen} collapsed={sidebarCollapsed} onClose={() => setSidebarOpen(false)} />
 
       <div id="main">
         <header id="topbar">
           <div className="topbar-left">
-            <button className="btn-hamburger" onClick={() => setSidebarOpen(s => !s)} aria-label="Toggle menu">
+            <button
+              className="btn-hamburger"
+              data-lte-toggle="sidebar"
+              onClick={() => {
+                if (window.innerWidth <= 768) setSidebarOpen(s => !s);
+                else setSidebarCollapsed(s => !s);
+              }}
+              aria-label="Toggle menu"
+            >
               <i className="fa-solid fa-bars" />
             </button>
             <div className="topbar-title">{TITLES[pathname] || 'Admin'}</div>
@@ -115,8 +123,9 @@ function Layout({ sidebarOpen, setSidebarOpen }) {
 }
 
 export default function App() {
-  const [loggedIn, setLoggedIn]       = useState(auth.isLoggedIn());
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [loggedIn, setLoggedIn]             = useState(auth.isLoggedIn());
+  const [sidebarOpen, setSidebarOpen]       = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const handleLogin = () => setLoggedIn(true);
 
@@ -128,7 +137,7 @@ export default function App() {
             {loggedIn
               ? (
                 <AuthProvider>
-                  <Layout sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+                  <Layout sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} sidebarCollapsed={sidebarCollapsed} setSidebarCollapsed={setSidebarCollapsed} />
                 </AuthProvider>
               )
               : <Login onLogin={handleLogin} />

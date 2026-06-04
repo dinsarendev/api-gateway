@@ -110,7 +110,7 @@ button { cursor: pointer; }
 .topbar-title { font-weight: 700; font-size: 1.05rem; color: var(--text-heading); }
 
 .btn-hamburger {
-  display: none;
+  display: inline-flex; align-items: center; justify-content: center;
   background: none; border: 1px solid var(--border); border-radius: .375rem;
   color: var(--text-primary); padding: .3rem .5rem; font-size: 1rem; line-height: 1;
 }
@@ -295,6 +295,14 @@ tbody tr:hover { background: var(--bg-surface-hover); }
 .count-item .num { font-size: 1.6rem; font-weight: 800; color: var(--text-heading); }
 .count-item .lbl { font-size: .75rem; color: var(--muted); }
 
+/* ── Desktop sidebar collapse ─────────────────────────────────────── */
+@media (min-width: 769px) {
+  #sidebar.collapsed {
+    width: 0; min-width: 0; overflow: hidden; padding: 0;
+    transition: width .25s ease, min-width .25s ease;
+  }
+}
+
 /* ── Responsive ──────────────────────────────────────────────────── */
 @media (max-width: 768px) {
   #sidebar {
@@ -305,7 +313,6 @@ tbody tr:hover { background: var(--bg-surface-hover); }
   #sidebar.open { transform: translateX(0); }
   .sidebar-overlay.open { display: block; }
   .sidebar-close { display: inline-flex; align-items: center; justify-content: center; }
-  .btn-hamburger { display: inline-flex; align-items: center; justify-content: center; }
 
   #topbar { padding: 0 1rem; }
   #content { padding: 1rem; }

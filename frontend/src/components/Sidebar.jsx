@@ -14,7 +14,7 @@ const NavItem = ({ to, icon, label, onClick }) => (
   </NavLink>
 );
 
-export default function Sidebar({ isOpen, onClose }) {
+export default function Sidebar({ isOpen, collapsed, onClose }) {
   const { can } = useAuth();
   const { brand } = useBrand();
 
@@ -29,7 +29,7 @@ export default function Sidebar({ isOpen, onClose }) {
   const initial  = (fullName || username || '?')[0].toUpperCase();
 
   return (
-    <nav id="sidebar" className={isOpen ? 'open' : ''}>
+    <nav id="sidebar" className={[isOpen ? 'open' : '', collapsed ? 'collapsed' : ''].filter(Boolean).join(' ')}>
       <div className="sidebar-brand">
         {brand.brandLogo
           ? <img src={brand.brandLogo} alt="" style={{ height: 22, objectFit: 'contain', flexShrink: 0 }} />
