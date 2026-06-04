@@ -47,9 +47,12 @@ export const API = {
   createRoute:  (data)           => post('/admin/routes', data),
   updateRoute:  (id, data)       => put(`/admin/routes/${id}`, data),
   deleteRoute:  (id)             => del(`/admin/routes/${id}`),
-  enableRoute:  (id)             => put(`/admin/routes/${id}/enable`),
-  disableRoute: (id)             => put(`/admin/routes/${id}/disable`),
-  reloadRoutes: ()               => post('/admin/routes/reload'),
+  enableRoute:     (id)           => put(`/admin/routes/${id}/enable`),
+  disableRoute:    (id)           => put(`/admin/routes/${id}/disable`),
+  deprecateRoute:  (id, data)     => put(`/admin/routes/${id}/deprecate`, data),
+  undeprecateRoute:(id)           => put(`/admin/routes/${id}/undeprecate`),
+  retireRoute:     (id)           => put(`/admin/routes/${id}/retire`),
+  reloadRoutes:    ()             => post('/admin/routes/reload'),
 
   // ── Groups ────────────────────────────────────────────────────────────────
   getGroups:    ()         => get('/admin/groups'),

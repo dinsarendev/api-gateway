@@ -3,7 +3,9 @@ package com.cambofreelance.apigateway.constants;
 public final class Constants {
   public static final String SUCCESS        = "SUCCESS";
   public static final String BEARER        = "Bearer ";
-  public static final String STATUS_ACTIVE = "ACT";
+  public static final String STATUS_ACTIVE     = "ACT";
+  public static final String STATUS_DEPRECATED = "DEPRECATED";
+  public static final String STATUS_RETIRED    = "RETIRED";
   public static final String SYSTEM        = "SYS";
   public static final String LANG_KH       = "km";
   public static final String LANG_CN       = "cn";

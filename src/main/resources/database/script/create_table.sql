@@ -76,7 +76,19 @@ ALTER TABLE public.api_route
 
 COMMENT ON COLUMN public.api_route.version     IS 'API version tag e.g. v1, v2, v3';
 COMMENT ON COLUMN public.api_route.deprecated  IS 'Y = inject Deprecation + Sunset headers';
-COMMENT ON COLUMN public.api_route.sunset_date IS 'Date after which the route will be retired (used in Sunset header)';
+COMMENT ON COLUMN public.api_route.sunset_date IS 'Date after which the route will be auto-retired';
+
+-- ── Deprecation lifecycle ──────────────────────────────────────────────────────
+-- api_route.status lifecycle values:
+--   ACT        — live, serving traffic
+--   DEPRECATED — serving traffic + injecting Deprecation/Sunset response headers
+--   RETIRED    — removed from gateway (no longer serves traffic)
+--   INACT      — administratively disabled
+-- RouteLifecycleScheduler auto-transitions DEPRECATED → RETIRED when sunset_date passes.
+
+CREATE INDEX IF NOT EXISTS idx_api_route_sunset
+    ON public.api_route (sunset_date)
+    WHERE status = 'DEPRECATED' AND sunset_date IS NOT NULL;
 
 -- ── Blue-Green deployment support on api_group_route ─────────────────────────
 ALTER TABLE public.api_group_route

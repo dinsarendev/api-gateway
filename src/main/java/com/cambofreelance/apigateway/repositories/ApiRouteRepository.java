@@ -107,4 +107,45 @@ public interface ApiRouteRepository extends R2dbcRepository<ApiRoute, Long> {
          WHERE id = :id
         """)
     Mono<Integer> updateStatus(Long id, String status, LocalDateTime updatedAt, String updatedBy);
+
+    @Query("""
+        SELECT a.*,
+               CASE WHEN g.active_slot = 'GREEN' AND g.green_uri IS NOT NULL AND g.green_uri <> ''
+                    THEN g.green_uri
+                    ELSE COALESCE(g.blue_uri, g.uri)
+               END AS uri
+          FROM public.api_route a
+          LEFT JOIN public.api_group_route g ON g.code = a.group_code
+          WHERE a.status IN ('ACT', 'DEPRECATED')
+          ORDER BY a.priority ASC NULLS LAST, a.id ASC
+        """)
+    Flux<ApiRoute> findAllForGateway();
+
+    @Query("""
+        SELECT a.*,
+               CASE WHEN g.active_slot = 'GREEN' AND g.green_uri IS NOT NULL AND g.green_uri <> ''
+                    THEN g.green_uri
+                    ELSE COALESCE(g.blue_uri, g.uri)
+               END AS uri
+          FROM public.api_route a
+          LEFT JOIN public.api_group_route g ON g.code = a.group_code
+          WHERE a.status = 'DEPRECATED'
+            AND a.sunset_date IS NOT NULL
+            AND a.sunset_date <= :now
+        """)
+    Flux<ApiRoute> findDeprecatedPastSunset(LocalDateTime now);
+
+    @Modifying
+    @Query("""
+        UPDATE public.api_route
+           SET status      = :status,
+               deprecated  = :deprecated,
+               sunset_date = :sunsetDate,
+               updated_at  = :updatedAt,
+               updated_by  = :updatedBy
+         WHERE id = :id
+        """)
+    Mono<Integer> updateDeprecation(Long id, String status, String deprecated,
+                                    LocalDateTime sunsetDate,
+                                    LocalDateTime updatedAt, String updatedBy);
 }

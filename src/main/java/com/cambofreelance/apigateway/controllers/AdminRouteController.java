@@ -1,7 +1,9 @@
 package com.cambofreelance.apigateway.controllers;
 
 import com.cambofreelance.apigateway.configs.AdminAuthHelper;
+import com.cambofreelance.apigateway.constants.Constants;
 import com.cambofreelance.apigateway.constants.Permissions;
+import com.cambofreelance.apigateway.dto.DeprecateRouteRequest;
 import com.cambofreelance.apigateway.dto.RouteApiRequest;
 import com.cambofreelance.apigateway.dto.RouteApiResponse;
 import com.cambofreelance.apigateway.service.ApiRouteService;
@@ -81,6 +83,38 @@ public class AdminRouteController {
         return adminAuth.require(exchange, Permissions.ROUTE_WRITE)
             .then(apiRouteService.delete(id)
                 .thenReturn(ResponseEntity.ok(Map.<String, Object>of("id", id, "message", "Route deleted"))));
+    }
+
+    @PutMapping("/{id}/deprecate")
+    public Mono<ResponseEntity<Map<String, Object>>> deprecate(
+            @PathVariable Long id, @RequestBody DeprecateRouteRequest request, ServerWebExchange exchange) {
+        return adminAuth.require(exchange, Permissions.ROUTE_WRITE)
+            .then(apiRouteService.deprecate(id, request.sunsetDate())
+                .thenReturn(ResponseEntity.ok(Map.<String, Object>of(
+                    "id", id,
+                    "status", Constants.STATUS_DEPRECATED,
+                    "sunset_date", request.sunsetDate().toString(),
+                    "message", "Route deprecated — will be retired after sunset_date"))));
+    }
+
+    @PutMapping("/{id}/undeprecate")
+    public Mono<ResponseEntity<Map<String, Object>>> undeprecate(@PathVariable Long id, ServerWebExchange exchange) {
+        return adminAuth.require(exchange, Permissions.ROUTE_WRITE)
+            .then(apiRouteService.undeprecate(id)
+                .thenReturn(ResponseEntity.ok(Map.<String, Object>of(
+                    "id", id,
+                    "status", Constants.STATUS_ACTIVE,
+                    "message", "Route restored to active"))));
+    }
+
+    @PutMapping("/{id}/retire")
+    public Mono<ResponseEntity<Map<String, Object>>> retire(@PathVariable Long id, ServerWebExchange exchange) {
+        return adminAuth.require(exchange, Permissions.ROUTE_WRITE)
+            .then(apiRouteService.retire(id)
+                .thenReturn(ResponseEntity.ok(Map.<String, Object>of(
+                    "id", id,
+                    "status", Constants.STATUS_RETIRED,
+                    "message", "Route retired and removed from gateway"))));
     }
 
     @PostMapping("/reload")

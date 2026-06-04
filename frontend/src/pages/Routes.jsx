@@ -29,6 +29,11 @@ const truncUri = uri => {
   return uri.length > 30 ? uri.slice(0, 28) + '…' : uri;
 };
 
+const fmtDate = iso =>
+  iso ? new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
+
+const toLocalDateTime = s => s ? (s.length === 16 ? s + ':00' : s) : null;
+
 const buildPayload = form => ({
   ...form,
   priority:             parseInt(form.priority, 10) || 1,
@@ -37,6 +42,28 @@ const buildPayload = form => ({
   description:          form.description   || null,
   application_id:       form.application_id || null,
 });
+
+// ── Status badge ────────────────────────────────────────────────────────────
+function StatusBadge({ route }) {
+  const { status, sunset_date } = route;
+  if (status === 'ACT')        return <span className="badge badge-act">Active</span>;
+  if (status === 'INACT')      return <span className="badge badge-inact">Inactive</span>;
+  if (status === 'RETIRED')    return <span className="badge badge-retired"><i className="fa-solid fa-ban" style={{ fontSize: '.65rem' }} /> Retired</span>;
+  if (status === 'DEPRECATED') return (
+    <div>
+      <span className="badge badge-deprecated">
+        <i className="fa-solid fa-clock-rotate-left" style={{ fontSize: '.65rem' }} /> Deprecated
+      </span>
+      {sunset_date && (
+        <div className="text-muted" style={{ fontSize: '.68rem', marginTop: '.25rem' }}>
+          <i className="fa-solid fa-calendar-xmark" style={{ marginRight: '.25rem', color: '#d97706' }} />
+          Sunset {fmtDate(sunset_date)}
+        </div>
+      )}
+    </div>
+  );
+  return <span className="badge badge-inact">{status}</span>;
+}
 
 // ── Pagination bar ─────────────────────────────────────────────────────────
 function Pagination({ page, total, pageSize, onChange }) {
@@ -95,17 +122,23 @@ export default function Routes() {
   // pagination
   const [page, setPage] = useState(0);
 
-  // UI state
+  // UI state — create/edit modal
   const [loading, setLoading] = useState(true);
   const [modal,   setModal]   = useState(false);
   const [form,    setForm]    = useState(EMPTY_FORM);
-  const [editId,  setEditId]  = useState(null);  // null = create
-  const [copying, setCopying] = useState(false); // true = copy mode (create pre-filled)
+  const [editId,  setEditId]  = useState(null);
+  const [copying, setCopying] = useState(false);
   const [saving,  setSaving]  = useState(false);
 
+  // UI state — deprecate modal
+  const [depModal,  setDepModal]  = useState(false);
+  const [depId,     setDepId]     = useState(null);
+  const [depDate,   setDepDate]   = useState('');
+  const [depSaving, setDepSaving] = useState(false);
+
+  const minDepDate = new Date(Date.now() + 86400000).toISOString().slice(0, 16);
+
   // ── Load ─────────────────────────────────────────────────────────────────
-  // Groups load once on mount — independent of the status filter so the
-  // dropdown is always populated when the modal opens.
   useEffect(() => {
     API.getGroups()
       .then(setGroups)
@@ -121,7 +154,6 @@ export default function Routes() {
 
   useEffect(() => { loadRoutes(); }, [loadRoutes]);
 
-  // Reset to page 0 whenever any filter changes
   useEffect(() => { setPage(0); }, [methodFilter, groupFilter, apiTypeFilter, search, status]);
 
   // ── Group lookup map ──────────────────────────────────────────────────────
@@ -143,7 +175,7 @@ export default function Routes() {
 
   const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
-  // ── Modal helpers ─────────────────────────────────────────────────────────
+  // ── Create/Edit modal helpers ─────────────────────────────────────────────
   const formFromRoute = r => ({
     group_code:             r.group_code             || '',
     path:                   r.path                   || '',
@@ -162,30 +194,10 @@ export default function Routes() {
     api_type:               r.api_type               || 'REST',
   });
 
-  const openCreate = () => {
-    setEditId(null);
-    setCopying(false);
-    setForm(EMPTY_FORM);
-    setModal(true);
-  };
-
-  const openEdit = r => {
-    setEditId(r.id);
-    setCopying(false);
-    setForm(formFromRoute(r));
-    setModal(true);
-  };
-
-  // Pre-fills all fields from source route, clears id → saves as new route
-  const openCopy = r => {
-    setEditId(null);
-    setCopying(true);
-    setForm({ ...formFromRoute(r), path: r.path });
-    setModal(true);
-  };
-
+  const openCreate = () => { setEditId(null); setCopying(false); setForm(EMPTY_FORM); setModal(true); };
+  const openEdit   = r  => { setEditId(r.id); setCopying(false); setForm(formFromRoute(r)); setModal(true); };
+  const openCopy   = r  => { setEditId(null); setCopying(true);  setForm({ ...formFromRoute(r), path: r.path }); setModal(true); };
   const closeModal = () => { setModal(false); setSaving(false); };
-
   const f = (key, val) => setForm(prev => ({ ...prev, [key]: val }));
 
   // ── Save ──────────────────────────────────────────────────────────────────
@@ -213,7 +225,7 @@ export default function Routes() {
     }
   };
 
-  // ── Actions ───────────────────────────────────────────────────────────────
+  // ── Lifecycle actions ─────────────────────────────────────────────────────
   const toggle = async (id, action) => {
     if (!window.confirm(`${action === 'enable' ? 'Enable' : 'Disable'} route #${id}?`)) return;
     try {
@@ -223,7 +235,48 @@ export default function Routes() {
     } catch { toast.error(`Failed to ${action} route`); }
   };
 
-  const remove = async (id) => {
+  const openDeprecateModal = r => {
+    setDepId(r.id);
+    setDepDate('');
+    setDepModal(true);
+  };
+  const closeDepModal = () => { setDepModal(false); setDepSaving(false); };
+
+  const doDeprecate = async () => {
+    if (!depDate) return toast.warn('Please select a sunset date.');
+    setDepSaving(true);
+    try {
+      await API.deprecateRoute(depId, { sunset_date: toLocalDateTime(depDate) });
+      toast.success('Route deprecated — deprecation headers will be added to all responses');
+      closeDepModal();
+      loadRoutes();
+    } catch(e) {
+      const msg = e?.message || (typeof e === 'object' ? JSON.stringify(e) : String(e));
+      toast.error('Deprecate failed: ' + msg);
+    } finally {
+      setDepSaving(false);
+    }
+  };
+
+  const doUndeprecate = async id => {
+    if (!window.confirm(`Restore route #${id} to active? Deprecation headers will stop being sent.`)) return;
+    try {
+      await API.undeprecateRoute(id);
+      toast.success('Route restored to active');
+      loadRoutes();
+    } catch { toast.error('Restore failed'); }
+  };
+
+  const doRetire = async id => {
+    if (!window.confirm(`Retire route #${id} immediately? It will stop serving traffic.`)) return;
+    try {
+      await API.retireRoute(id);
+      toast.success('Route retired and removed from gateway');
+      loadRoutes();
+    } catch { toast.error('Retire failed'); }
+  };
+
+  const remove = async id => {
     if (!window.confirm(`Delete route #${id}? (soft-delete — recoverable)`)) return;
     try { await API.deleteRoute(id); toast.success('Route deleted'); loadRoutes(); }
     catch { toast.error('Delete failed'); }
@@ -235,46 +288,39 @@ export default function Routes() {
   };
 
   // ── Modal title ───────────────────────────────────────────────────────────
-  const modalTitle = editId
-    ? `Edit Route #${editId}`
-    : copying
-    ? 'Duplicate Route'
-    : 'New Route';
+  const modalTitle = editId ? `Edit Route #${editId}` : copying ? 'Duplicate Route' : 'New Route';
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div>
       {/* Filter bar */}
       <div className="filter-bar">
-        {/* Status */}
         <select className="form-select" style={{ width: 'auto' }} value={status}
           onChange={e => setStatus(e.target.value)}>
           <option value="ACT">Active</option>
+          <option value="DEPRECATED">Deprecated</option>
+          <option value="RETIRED">Retired</option>
           <option value="INACT">Inactive</option>
         </select>
 
-        {/* Method */}
         <select className="form-select" style={{ width: 'auto' }} value={methodFilter}
           onChange={e => setMethodFilter(e.target.value)}>
           <option value="">All Methods</option>
           {['GET', 'POST', 'PUT', 'DELETE', 'PATCH'].map(m => <option key={m}>{m}</option>)}
         </select>
 
-        {/* API Type filter */}
         <select className="form-select" style={{ width: 'auto' }} value={apiTypeFilter}
           onChange={e => setApiTypeFilter(e.target.value)}>
           <option value="">All Types</option>
           {API_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
         </select>
 
-        {/* Group filter */}
         <select className="form-select" style={{ width: 'auto' }} value={groupFilter}
           onChange={e => setGroupFilter(e.target.value)}>
           <option value="">All Groups</option>
           {groups.map(g => <option key={g.code} value={g.code}>{g.code}</option>)}
         </select>
 
-        {/* Path search */}
         <input className="form-control" style={{ width: '200px' }} placeholder="Search path…"
           value={search} onChange={e => setSearch(e.target.value)} />
 
@@ -309,7 +355,7 @@ export default function Routes() {
                     <th>Public</th>
                     <th>Rate Limit</th>
                     <th>Status</th>
-                    <th style={{ width: 136 }}>Actions</th>
+                    <th style={{ width: 160 }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -355,19 +401,61 @@ export default function Routes() {
                           <td className="text-sm text-muted">
                             {r.rate_limit ? `${r.rate_limit} / ${r.rate_limit_duration}s` : '—'}
                           </td>
-                          <td>
-                            <span className={`badge badge-${r.status === 'ACT' ? 'act' : 'inact'}`}>
-                              {r.status === 'ACT' ? 'Active' : 'Inactive'}
-                            </span>
-                          </td>
+                          <td><StatusBadge route={r} /></td>
                           <td>
                             <div className="actions-row">
-                              {canWrite && <button className="btn-action" title="Edit"      onClick={() => openEdit(r)}><i className="fa-solid fa-pen"  /></button>}
-                              {canWrite && <button className="btn-action" title="Duplicate" onClick={() => openCopy(r)}><i className="fa-solid fa-copy" /></button>}
-                              {canWrite && (r.status === 'ACT'
-                                ? <button className="btn-action warning" title="Disable" onClick={() => toggle(r.id, 'disable')}><i className="fa-solid fa-pause" /></button>
-                                : <button className="btn-action success" title="Enable"  onClick={() => toggle(r.id, 'enable')} ><i className="fa-solid fa-play"  /></button>)}
-                              {canWrite && <button className="btn-action danger" title="Delete" onClick={() => remove(r.id)}><i className="fa-solid fa-trash" /></button>}
+                              {/* Edit — not available for retired */}
+                              {canWrite && r.status !== 'RETIRED' && (
+                                <button className="btn-action" title="Edit" onClick={() => openEdit(r)}>
+                                  <i className="fa-solid fa-pen" />
+                                </button>
+                              )}
+                              {/* Duplicate always available */}
+                              {canWrite && (
+                                <button className="btn-action" title="Duplicate" onClick={() => openCopy(r)}>
+                                  <i className="fa-solid fa-copy" />
+                                </button>
+                              )}
+
+                              {/* ── ACT: deprecate + disable ── */}
+                              {canWrite && r.status === 'ACT' && (<>
+                                <button className="btn-action warning" title="Deprecate"
+                                  onClick={() => openDeprecateModal(r)}>
+                                  <i className="fa-solid fa-clock-rotate-left" />
+                                </button>
+                                <button className="btn-action warning" title="Disable"
+                                  onClick={() => toggle(r.id, 'disable')}>
+                                  <i className="fa-solid fa-pause" />
+                                </button>
+                              </>)}
+
+                              {/* ── DEPRECATED: restore or retire ── */}
+                              {canWrite && r.status === 'DEPRECATED' && (<>
+                                <button className="btn-action success" title="Restore to Active"
+                                  onClick={() => doUndeprecate(r.id)}>
+                                  <i className="fa-solid fa-rotate-left" />
+                                </button>
+                                <button className="btn-action danger" title="Retire Now"
+                                  onClick={() => doRetire(r.id)}>
+                                  <i className="fa-solid fa-ban" />
+                                </button>
+                              </>)}
+
+                              {/* ── INACT: re-enable ── */}
+                              {canWrite && r.status === 'INACT' && (
+                                <button className="btn-action success" title="Enable"
+                                  onClick={() => toggle(r.id, 'enable')}>
+                                  <i className="fa-solid fa-play" />
+                                </button>
+                              )}
+
+                              {/* Delete — not for deprecated (must retire first) */}
+                              {canWrite && r.status !== 'DEPRECATED' && (
+                                <button className="btn-action danger" title="Delete"
+                                  onClick={() => remove(r.id)}>
+                                  <i className="fa-solid fa-trash" />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -378,15 +466,10 @@ export default function Routes() {
             )}
         </div>
 
-        <Pagination
-          page={page}
-          total={filtered.length}
-          pageSize={PAGE_SIZE}
-          onChange={setPage}
-        />
+        <Pagination page={page} total={filtered.length} pageSize={PAGE_SIZE} onChange={setPage} />
       </div>
 
-      {/* Create / Edit / Copy Modal */}
+      {/* ── Create / Edit / Copy Modal ─────────────────────────────────────── */}
       <Modal
         show={modal}
         onClose={closeModal}
@@ -529,7 +612,7 @@ export default function Routes() {
           </div>
         </div>
 
-        {/* Row 5: Security — only relevant when is_public = N */}
+        {/* Row 5: Security */}
         <div style={{ borderTop: '1px solid #e2e8f0', marginTop: '.5rem', paddingTop: '1rem' }}>
           <div style={{ fontSize: '.78rem', fontWeight: 700, color: '#64748b', letterSpacing: '.06em',
             textTransform: 'uppercase', marginBottom: '.75rem' }}>
@@ -561,6 +644,51 @@ export default function Routes() {
                 disabled={form.is_public === 'Y' || form.auth_type === 'NONE'} />
               <div className="form-hint">All listed permissions must be present.</div>
             </div>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Deprecate Modal ────────────────────────────────────────────────── */}
+      <Modal
+        show={depModal}
+        onClose={closeDepModal}
+        title={`Deprecate Route #${depId}`}
+        footer={
+          <>
+            <button className="btn btn-secondary" onClick={closeDepModal}>Cancel</button>
+            <button className="btn" onClick={doDeprecate} disabled={depSaving}
+              style={{ background: '#d97706', color: '#fff', borderColor: '#d97706' }}>
+              {depSaving ? 'Deprecating…' : 'Deprecate Route'}
+            </button>
+          </>
+        }
+      >
+        <div style={{ display: 'flex', gap: '.75rem', background: '#fef3c7',
+          border: '1px solid #fde68a', borderRadius: '.5rem', padding: '.85rem 1rem',
+          marginBottom: '1.25rem', alignItems: 'flex-start' }}>
+          <i className="fa-solid fa-triangle-exclamation" style={{ color: '#d97706', marginTop: '.1rem', flexShrink: 0 }} />
+          <div style={{ fontSize: '.85rem', color: '#92400e', lineHeight: 1.5 }}>
+            The route will continue to serve traffic but all responses will include
+            <code style={{ margin: '0 .3rem', background: '#fde68a', padding: '.1em .35em', borderRadius: '.2rem' }}>Deprecation: true</code>
+            and
+            <code style={{ margin: '0 .3rem', background: '#fde68a', padding: '.1em .35em', borderRadius: '.2rem' }}>Sunset:</code>
+            headers. It will be automatically retired after the sunset date.
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">
+            Sunset Date <span className="text-required">*</span>
+          </label>
+          <input
+            type="datetime-local"
+            className="form-control"
+            value={depDate}
+            min={minDepDate}
+            onChange={e => setDepDate(e.target.value)}
+          />
+          <div className="form-hint">
+            The gateway will automatically retire this route after this date. Must be in the future.
           </div>
         </div>
       </Modal>

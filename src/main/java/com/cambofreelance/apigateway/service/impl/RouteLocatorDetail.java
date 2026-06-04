@@ -41,7 +41,7 @@ public class RouteLocatorDetail implements RouteLocator {
     public Flux<Route> getRoutes() {
         RouteLocatorBuilder.Builder builder = routeLocatorBuilder.routes();
 
-        return apiRouteRepository.findAllByStatus(Constants.STATUS_ACTIVE)
+        return apiRouteRepository.findAllForGateway()
                 .filter(this::isRouteAvailableNow)
                 .sort(Comparator.comparing(ApiRoute::getPriority, Comparator.nullsLast(Integer::compareTo)))
                 .map(route -> builder.route(route.getId().toString(), spec -> setPredicateSpec(route, spec)))

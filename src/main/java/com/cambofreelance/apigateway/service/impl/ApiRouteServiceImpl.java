@@ -199,6 +199,66 @@ public class ApiRouteServiceImpl implements ApiRouteService {
             .then();
     }
 
+    // ── Lifecycle ─────────────────────────────────────────────────────────────
+
+    @Override
+    public Mono<Void> deprecate(Long id, LocalDateTime sunsetDate) {
+        if (sunsetDate == null) {
+            return Mono.error(new RouteCreationException("sunset_date is required when deprecating a route"));
+        }
+        if (sunsetDate.isBefore(LocalDateTime.now())) {
+            return Mono.error(new RouteCreationException("sunset_date must be in the future"));
+        }
+        return apiRouteRepository.findByIdWithUri(id)
+            .switchIfEmpty(Mono.error(new RouteNotFoundException("Route not found: " + id)))
+            .flatMap(route -> {
+                if (!Constants.STATUS_ACTIVE.equals(route.getStatus())) {
+                    return Mono.error(new RouteCreationException(
+                        "Only ACT routes can be deprecated (current status: " + route.getStatus() + ")"));
+                }
+                return apiRouteRepository.updateDeprecation(
+                    id, Constants.STATUS_DEPRECATED, "Y", sunsetDate, LocalDateTime.now(), ADMIN);
+            })
+            .filter(rows -> rows > 0)
+            .switchIfEmpty(Mono.error(new RouteNotFoundException("Route not found: " + id)))
+            .doOnSuccess(r -> refreshAll())
+            .then();
+    }
+
+    @Override
+    public Mono<Void> undeprecate(Long id) {
+        return apiRouteRepository.findByIdWithUri(id)
+            .switchIfEmpty(Mono.error(new RouteNotFoundException("Route not found: " + id)))
+            .flatMap(route -> {
+                if (!Constants.STATUS_DEPRECATED.equals(route.getStatus())) {
+                    return Mono.error(new RouteCreationException(
+                        "Only DEPRECATED routes can be un-deprecated (current status: " + route.getStatus() + ")"));
+                }
+                return apiRouteRepository.updateDeprecation(
+                    id, Constants.STATUS_ACTIVE, "N", null, LocalDateTime.now(), ADMIN);
+            })
+            .filter(rows -> rows > 0)
+            .switchIfEmpty(Mono.error(new RouteNotFoundException("Route not found: " + id)))
+            .doOnSuccess(r -> refreshAll())
+            .then();
+    }
+
+    @Override
+    public Mono<Void> retire(Long id) {
+        return apiRouteRepository.findByIdWithUri(id)
+            .switchIfEmpty(Mono.error(new RouteNotFoundException("Route not found: " + id)))
+            .flatMap(route -> {
+                if (Constants.STATUS_RETIRED.equals(route.getStatus())) {
+                    return Mono.error(new RouteCreationException("Route is already retired"));
+                }
+                return apiRouteRepository.updateStatus(id, Constants.STATUS_RETIRED, LocalDateTime.now(), ADMIN);
+            })
+            .filter(rows -> rows > 0)
+            .switchIfEmpty(Mono.error(new RouteNotFoundException("Route not found: " + id)))
+            .doOnSuccess(r -> refreshAll())
+            .then();
+    }
+
     // ── Reload ────────────────────────────────────────────────────────────────
 
     @Override
