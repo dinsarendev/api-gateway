@@ -1,0 +1,13 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: gateway-dashboard
+  namespace: ms-dev
+spec:
+  ports:
+    - protocol: TCP
+      port: 3009
+      targetPort: 80
+  selector:
+    component: gateway-dashboard
+  type: ClusterIP
