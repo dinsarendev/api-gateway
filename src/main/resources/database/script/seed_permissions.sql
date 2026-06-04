@@ -24,7 +24,8 @@ VALUES
     ('ROLE_WRITE',      'Create / update / delete roles and assign permissions', 'ACT', NOW(), 'SYS'),
     ('MONITORING_READ', 'View live gateway metrics and monitoring dashboard',     'ACT', NOW(), 'SYS'),
     ('INCIDENT_READ',   'View incidents and incident dashboard',                  'ACT', NOW(), 'SYS'),
-    ('INCIDENT_WRITE',  'Create, update, resolve and close incidents',            'ACT', NOW(), 'SYS')
+    ('INCIDENT_WRITE',  'Create, update, resolve and close incidents',            'ACT', NOW(), 'SYS'),
+    ('AUDIT_LOG_READ',  'View audit logs',                                        'ACT', NOW(), 'SYS')
 ON CONFLICT (name) DO NOTHING;
 
 -- ── 2. Upsert roles ──────────────────────────────────────────
@@ -57,7 +58,8 @@ FROM   public.admin_role r
              'SECURITY_READ',
              'ROLE_READ',
              'MONITORING_READ',
-             'INCIDENT_READ',  'INCIDENT_WRITE'
+             'INCIDENT_READ',  'INCIDENT_WRITE',
+             'AUDIT_LOG_READ'
          )
 WHERE  r.name = 'OPERATOR'
   AND  p.status = 'ACT'
@@ -77,7 +79,8 @@ FROM   public.admin_role r
              'ROLE_READ',
              'USER_READ',
              'MONITORING_READ',
-             'INCIDENT_READ'
+             'INCIDENT_READ',
+             'AUDIT_LOG_READ'
          )
 WHERE  r.name = 'VIEWER'
   AND  p.status = 'ACT'

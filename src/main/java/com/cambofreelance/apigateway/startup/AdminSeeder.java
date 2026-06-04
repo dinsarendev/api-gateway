@@ -37,6 +37,7 @@ public class AdminSeeder {
         new String[]{"USER_WRITE",       "Create / update / delete admin users"},
         new String[]{"ROLE_READ",        "View roles and permissions"},
         new String[]{"ROLE_WRITE",       "Create / update / delete roles and assign permissions"},
+        new String[]{"MONITORING_READ",   "View live gateway metrics and monitoring dashboard"},
         new String[]{"INCIDENT_READ",    "View incidents"},
         new String[]{"INCIDENT_WRITE",   "Create / update / resolve incidents"},
         new String[]{"AUDIT_LOG_READ",   "View audit logs"}
@@ -70,7 +71,7 @@ public class AdminSeeder {
             List<String> operatorPerms = List.of(
                 "ROUTE_READ", "ROUTE_WRITE", "GROUP_READ", "GROUP_WRITE",
                 "REGISTRY_READ", "HEALTH_READ", "SECURITY_READ",
-                "ROLE_READ", "INCIDENT_READ", "INCIDENT_WRITE", "AUDIT_LOG_READ"
+                "ROLE_READ", "MONITORING_READ", "INCIDENT_READ", "INCIDENT_WRITE", "AUDIT_LOG_READ"
             );
             for (AdminPermission perm : allPerms) {
                 if (operatorPerms.contains(perm.getName())) {
@@ -89,7 +90,7 @@ public class AdminSeeder {
             AdminRole viewer = upsertRole("VIEWER", "Read-only access");
             List<String> viewerPerms = List.of(
                 "ROUTE_READ", "GROUP_READ", "REGISTRY_READ", "HEALTH_READ", "SECURITY_READ",
-                "ROLE_READ", "USER_READ", "INCIDENT_READ", "AUDIT_LOG_READ"
+                "ROLE_READ", "USER_READ", "MONITORING_READ", "INCIDENT_READ", "AUDIT_LOG_READ"
             );
             for (AdminPermission perm : allPerms) {
                 if (viewerPerms.contains(perm.getName())) {
