@@ -81,10 +81,13 @@ export default function Sidebar({ isOpen, collapsed, onClose }) {
         <div className="sidebar-section">ROUTING</div>
       )}
       {can(PERMS.ROUTE_READ) && (
-        <NavItem to="/routes" icon="fa-route" label="Routes" onClick={onClose} />
+        <NavItem to="/routes"     icon="fa-route"          label="Routes"          onClick={onClose} />
+      )}
+      {can(PERMS.ROUTE_READ) && (
+        <NavItem to="/governance" icon="fa-scale-balanced" label="Governance Docs"  onClick={onClose} />
       )}
       {can(PERMS.GROUP_READ) && (
-        <NavItem to="/groups" icon="fa-layer-group" label="Service Groups" onClick={onClose} />
+        <NavItem to="/groups"     icon="fa-layer-group"    label="Service Groups"   onClick={onClose} />
       )}
 
       {(can(PERMS.INCIDENT_READ) || can(PERMS.MONITORING_READ)) && (

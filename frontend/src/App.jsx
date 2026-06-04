@@ -19,6 +19,7 @@ import Incidents       from './pages/Incidents';
 import Monitoring      from './pages/Monitoring';
 import AuditLogs       from './pages/AuditLogs';
 import Profile         from './pages/Profile';
+import GovernanceDocs  from './pages/GovernanceDocs';
 import Login           from './pages/Login';
 import { auth } from './auth';
 
@@ -37,6 +38,7 @@ const TITLES = {
   '/roles':             'Role Management',
   '/audit-logs':        'Audit Logs',
   '/profile':           'My Profile',
+  '/governance':        'API Governance',
 };
 
 function Layout({ sidebarOpen, setSidebarOpen, sidebarCollapsed, setSidebarCollapsed }) {
@@ -113,8 +115,9 @@ function Layout({ sidebarOpen, setSidebarOpen, sidebarCollapsed, setSidebarColla
             <Route path="/users"             element={<Users />} />
             <Route path="/roles"             element={<Roles />} />
             <Route path="/audit-logs"        element={<AuditLogs />} />
-            <Route path="/profile"           element={<Profile />} />
-            <Route path="*"                  element={<Navigate to="/" replace />} />
+            <Route path="/profile"             element={<Profile />} />
+            <Route path="/governance"          element={<GovernanceDocs />} />
+            <Route path="*"                    element={<Navigate to="/" replace />} />
           </Routes>
         </div>
       </div>
