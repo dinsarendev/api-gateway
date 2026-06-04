@@ -202,7 +202,9 @@ public class RequestLoggingFilter implements GlobalFilter {
     private String resolveClientIp(ServerHttpRequest request) {
         String forwarded = request.getHeaders().getFirst(Constants.X_FORWARDED_FOR);
         if (StringUtils.isNotBlank(forwarded)) {
-            return forwarded.split(",")[0].trim();
+            // Take the rightmost entry — added by our infrastructure, not client-controlled
+            String[] ips = forwarded.split(",");
+            return ips[ips.length - 1].trim();
         }
         return Optional.ofNullable(request.getRemoteAddress())
             .map(addr -> addr.getAddress().getHostAddress())
@@ -211,7 +213,9 @@ public class RequestLoggingFilter implements GlobalFilter {
 
     private String resolveCorrelationId(ServerHttpRequest request) {
         String existing = request.getHeaders().getFirst(Constants.CORRELATION_ID);
-        return StringUtils.isNotBlank(existing) ? existing : UUID.randomUUID().toString();
+        if (StringUtils.isBlank(existing)) return UUID.randomUUID().toString();
+        // Strip control characters to prevent log injection
+        return existing.replaceAll("[\\r\\n\\t]", "_");
     }
 
     private Mono<Void> errorResponse(ServerWebExchange exchange, HttpStatus status, String errorCode, String message) {

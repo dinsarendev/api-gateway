@@ -1,6 +1,7 @@
 package com.cambofreelance.apigateway.service.impl;
 
 import com.cambofreelance.apigateway.models.AdminRefreshToken;
+import com.cambofreelance.apigateway.models.AdminUser;
 import com.cambofreelance.apigateway.repositories.AdminPermissionRepository;
 import com.cambofreelance.apigateway.repositories.AdminRefreshTokenRepository;
 import com.cambofreelance.apigateway.repositories.AdminRoleRepository;
@@ -12,11 +13,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.mindrot.jbcrypt.BCrypt;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.security.MessageDigest;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.HexFormat;
 import java.util.List;
@@ -27,46 +30,40 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AdminAuthService {
 
-    private final AdminUserRepository        userRepository;
-    private final AdminRoleRepository        roleRepository;
-    private final AdminPermissionRepository  permissionRepository;
+    private final AdminUserRepository         userRepository;
+    private final AdminRoleRepository         roleRepository;
+    private final AdminPermissionRepository   permissionRepository;
     private final AdminRefreshTokenRepository refreshTokenRepository;
-    private final JwtUtils jwtUtils;
+    private final JwtUtils                    jwtUtils;
+    private final StringRedisTemplate         stringRedisTemplate;
 
     @Value("${authentication.refreshTokenExpireDays:7}")
     private int refreshTokenExpireDays;
 
+    @Value("${security.login.max-attempts:10}")
+    private int maxLoginAttempts;
+
+    @Value("${security.login.lockout-seconds:900}")
+    private int lockoutSeconds;
+
+    private static final String LOGIN_ATTEMPT_PREFIX = "login:attempts:";
+
     // ── Login ─────────────────────────────────────────────────────────────────
 
     public Mono<TokenPair> login(String username, String password) {
-        return userRepository.findActiveByUsername(username)
+        return checkLoginRateLimit(username)
+            .then(userRepository.findActiveByUsername(username))
             .publishOn(Schedulers.boundedElastic())
-            .filter(u -> BCrypt.checkpw(password, u.getPasswordHash()))
-            .switchIfEmpty(Mono.error(new UnauthorizedException("Invalid username or password")))
-            .flatMap(user ->
-                roleRepository.findByUserId(user.getId())
-                    .map(r -> r.getName())
-                    .collectList()
-                    .flatMap(roles -> permissionRepository.findByUserId(user.getId())
-                        .map(p -> p.getName())
-                        .collectList()
-                        .flatMap(perms -> {
-                            String accessToken = jwtUtils.generateAdminToken(user.getUsername(), user.getId(), roles, perms);
-                            String rawRefresh  = newRefreshToken();
-                            AdminRefreshToken rt = AdminRefreshToken.builder()
-                                .userId(user.getId())
-                                .tokenHash(sha256(rawRefresh))
-                                .expiresAt(LocalDateTime.now().plusDays(refreshTokenExpireDays))
-                                .revoked(false)
-                                .createdAt(LocalDateTime.now())
-                                .build();
-                            return refreshTokenRepository.save(rt)
-                                .then(userRepository.touchLastLogin(user.getId(), LocalDateTime.now()))
-                                .thenReturn(new TokenPair(
-                                    accessToken, rawRefresh,
-                                    3600, user.getUsername(), user.getFullName(), roles, perms
-                                ));
-                        }))
+            .flatMap(user -> {
+                if (!BCrypt.checkpw(password, user.getPasswordHash())) {
+                    return recordFailedAttempt(username)
+                        .<TokenPair>then(Mono.error(new UnauthorizedException("Invalid username or password")));
+                }
+                return resetFailedAttempts(username).then(buildTokenPair(user));
+            })
+            .switchIfEmpty(
+                recordFailedAttempt(username)
+                    .then(Mono.error(new UnauthorizedException("Invalid username or password")))
             );
     }
 
@@ -77,33 +74,10 @@ public class AdminAuthService {
         return refreshTokenRepository.findValid(hash)
             .switchIfEmpty(Mono.error(new UnauthorizedException("Invalid or expired refresh token")))
             .flatMap(rt ->
-                refreshTokenRepository.revokeById(rt.getId())        // rotate
+                refreshTokenRepository.revokeById(rt.getId())
                     .then(userRepository.findById(rt.getUserId()))
                     .switchIfEmpty(Mono.error(new UnauthorizedException("User not found")))
-                    .flatMap(user ->
-                        roleRepository.findByUserId(user.getId())
-                            .map(r -> r.getName())
-                            .collectList()
-                            .flatMap(roles -> permissionRepository.findByUserId(user.getId())
-                                .map(p -> p.getName())
-                                .collectList()
-                                .flatMap(perms -> {
-                                    String newAccess     = jwtUtils.generateAdminToken(user.getUsername(), user.getId(), roles, perms);
-                                    String rawNewRefresh = newRefreshToken();
-                                    AdminRefreshToken newRt = AdminRefreshToken.builder()
-                                        .userId(user.getId())
-                                        .tokenHash(sha256(rawNewRefresh))
-                                        .expiresAt(LocalDateTime.now().plusDays(refreshTokenExpireDays))
-                                        .revoked(false)
-                                        .createdAt(LocalDateTime.now())
-                                        .build();
-                                    return refreshTokenRepository.save(newRt)
-                                        .thenReturn(new TokenPair(
-                                            newAccess, rawNewRefresh,
-                                            3600, user.getUsername(), user.getFullName(), roles, perms
-                                        ));
-                                }))
-                    )
+                    .flatMap(this::buildTokenPair)
             );
     }
 
@@ -136,6 +110,82 @@ public class AdminAuthService {
                 String newHash = BCrypt.hashpw(newPassword, BCrypt.gensalt(12));
                 return userRepository.updatePassword(user.getId(), newHash, LocalDateTime.now(), username);
             }).then();
+    }
+
+    // ── Brute-force protection ─────────────────────────────────────────────────
+
+    private Mono<Void> checkLoginRateLimit(String username) {
+        String key = LOGIN_ATTEMPT_PREFIX + username;
+        return Mono.fromCallable(() -> {
+            try {
+                String val = stringRedisTemplate.opsForValue().get(key);
+                return val != null ? Integer.parseInt(val) : 0;
+            } catch (Exception e) {
+                log.warn("Login rate limit check failed (fail-open): {}", e.getMessage());
+                return 0;
+            }
+        })
+        .subscribeOn(Schedulers.boundedElastic())
+        .flatMap(count -> {
+            if (count >= maxLoginAttempts) {
+                log.warn("Login blocked for '{}' after {} failed attempts", username, count);
+                return Mono.error(new UnauthorizedException(
+                    "Account temporarily locked due to too many failed attempts. Try again later."));
+            }
+            return Mono.empty();
+        });
+    }
+
+    private Mono<Void> recordFailedAttempt(String username) {
+        String key = LOGIN_ATTEMPT_PREFIX + username;
+        return Mono.fromRunnable(() -> {
+            try {
+                stringRedisTemplate.opsForValue().increment(key);
+                stringRedisTemplate.expire(key, Duration.ofSeconds(lockoutSeconds));
+            } catch (Exception e) {
+                log.warn("Failed to record login attempt for '{}': {}", username, e.getMessage());
+            }
+        }).subscribeOn(Schedulers.boundedElastic()).then();
+    }
+
+    private Mono<Void> resetFailedAttempts(String username) {
+        String key = LOGIN_ATTEMPT_PREFIX + username;
+        return Mono.fromRunnable(() -> {
+            try {
+                stringRedisTemplate.delete(key);
+            } catch (Exception e) {
+                log.warn("Failed to reset login attempts for '{}': {}", username, e.getMessage());
+            }
+        }).subscribeOn(Schedulers.boundedElastic()).then();
+    }
+
+    // ── Token construction ────────────────────────────────────────────────────
+
+    private Mono<TokenPair> buildTokenPair(AdminUser user) {
+        return roleRepository.findByUserId(user.getId())
+            .map(r -> r.getName())
+            .collectList()
+            .flatMap(roles -> permissionRepository.findByUserId(user.getId())
+                .map(p -> p.getName())
+                .collectList()
+                .flatMap(perms -> {
+                    String accessToken = jwtUtils.generateAdminToken(
+                        user.getUsername(), user.getId(), roles, perms);
+                    String rawRefresh  = newRefreshToken();
+                    AdminRefreshToken rt = AdminRefreshToken.builder()
+                        .userId(user.getId())
+                        .tokenHash(sha256(rawRefresh))
+                        .expiresAt(LocalDateTime.now().plusDays(refreshTokenExpireDays))
+                        .revoked(false)
+                        .createdAt(LocalDateTime.now())
+                        .build();
+                    return refreshTokenRepository.save(rt)
+                        .then(userRepository.touchLastLogin(user.getId(), LocalDateTime.now()))
+                        .thenReturn(new TokenPair(
+                            accessToken, rawRefresh,
+                            3600, user.getUsername(), user.getFullName(), roles, perms
+                        ));
+                }));
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

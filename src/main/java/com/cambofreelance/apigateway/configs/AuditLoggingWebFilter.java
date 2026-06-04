@@ -234,7 +234,9 @@ public class AuditLoggingWebFilter implements WebFilter {
     private String resolveIp(ServerHttpRequest request) {
         String forwarded = request.getHeaders().getFirst("X-Forwarded-For");
         if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.split(",")[0].trim();
+            // Take the rightmost entry — added by our infrastructure, not client-controlled
+            String[] ips = forwarded.split(",");
+            return ips[ips.length - 1].trim();
         }
         InetSocketAddress addr = request.getRemoteAddress();
         return addr != null ? addr.getAddress().getHostAddress() : null;

@@ -6,6 +6,7 @@ import com.cambofreelance.apigateway.constants.Permissions;
 import com.cambofreelance.apigateway.models.ApiGroupRoute;
 import com.cambofreelance.apigateway.repositories.ApiGroupRouteRepository;
 import com.cambofreelance.apigateway.service.impl.GatewayRouteService;
+import com.cambofreelance.apigateway.utils.SsrfGuard;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
@@ -70,19 +72,29 @@ public class AdminGroupController {
     @PostMapping
     public Mono<ResponseEntity<ApiGroupRoute>> create(@RequestBody ApiGroupRoute request, ServerWebExchange exchange) {
         return adminAuth.require(exchange, Permissions.GROUP_WRITE)
-            .then(groupRouteRepository.existsByCode(request.getCode())
-                .flatMap(exists -> {
-                    if (Boolean.TRUE.equals(exists)) {
-                        return Mono.<ResponseEntity<ApiGroupRoute>>just(
-                            ResponseEntity.status(HttpStatus.CONFLICT).build());
-                    }
-                    request.setId(null);
-                    request.setStatus(Constants.STATUS_ACTIVE);
-                    request.setCreatedAt(LocalDateTime.now());
-                    request.setCreatedBy(adminAuth.currentUser(exchange));
-                    return groupRouteRepository.save(request)
-                        .map(g -> ResponseEntity.status(HttpStatus.CREATED).body(g));
-                }));
+            .then(Mono.defer(() -> {
+                try {
+                    if (request.getUri()      != null) SsrfGuard.assertSafeUri(request.getUri());
+                    if (request.getBlueUri()  != null) SsrfGuard.assertSafeUri(request.getBlueUri());
+                    if (request.getGreenUri() != null) SsrfGuard.assertSafeUri(request.getGreenUri());
+                } catch (IllegalArgumentException e) {
+                    return Mono.error(new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST, "Invalid upstream URI: " + e.getMessage()));
+                }
+                return groupRouteRepository.existsByCode(request.getCode())
+                    .flatMap(exists -> {
+                        if (Boolean.TRUE.equals(exists)) {
+                            return Mono.<ResponseEntity<ApiGroupRoute>>just(
+                                ResponseEntity.status(HttpStatus.CONFLICT).build());
+                        }
+                        request.setId(null);
+                        request.setStatus(Constants.STATUS_ACTIVE);
+                        request.setCreatedAt(LocalDateTime.now());
+                        request.setCreatedBy(adminAuth.currentUser(exchange));
+                        return groupRouteRepository.save(request)
+                            .map(g -> ResponseEntity.status(HttpStatus.CREATED).body(g));
+                    });
+            }));
     }
 
     // ── Update ────────────────────────────────────────────────────────────────
@@ -91,17 +103,25 @@ public class AdminGroupController {
     public Mono<ResponseEntity<ApiGroupRoute>> update(
             @PathVariable Long id, @RequestBody ApiGroupRoute request, ServerWebExchange exchange) {
         return adminAuth.require(exchange, Permissions.GROUP_WRITE)
-            .then(groupRouteRepository.findById(id)
-                .switchIfEmpty(Mono.error(new RuntimeException("Group not found: " + id)))
-                .flatMap(existing -> {
-                    if (request.getUri()  != null) existing.setUri(request.getUri());
-                    if (request.getCode() != null) existing.setCode(request.getCode());
-                    existing.setUpdatedAt(LocalDateTime.now());
-                    existing.setUpdatedBy(adminAuth.currentUser(exchange));
-                    return groupRouteRepository.save(existing);
-                })
-                .map(ResponseEntity::ok)
-                .defaultIfEmpty(ResponseEntity.<ApiGroupRoute>notFound().build()));
+            .then(Mono.defer(() -> {
+                try {
+                    if (request.getUri() != null) SsrfGuard.assertSafeUri(request.getUri());
+                } catch (IllegalArgumentException e) {
+                    return Mono.error(new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST, "Invalid upstream URI: " + e.getMessage()));
+                }
+                return groupRouteRepository.findById(id)
+                    .switchIfEmpty(Mono.error(new RuntimeException("Group not found: " + id)))
+                    .flatMap(existing -> {
+                        if (request.getUri()  != null) existing.setUri(request.getUri());
+                        if (request.getCode() != null) existing.setCode(request.getCode());
+                        existing.setUpdatedAt(LocalDateTime.now());
+                        existing.setUpdatedBy(adminAuth.currentUser(exchange));
+                        return groupRouteRepository.save(existing);
+                    })
+                    .map(ResponseEntity::ok)
+                    .defaultIfEmpty(ResponseEntity.<ApiGroupRoute>notFound().build());
+            }));
     }
 
     // ── Delete (soft) ─────────────────────────────────────────────────────────
@@ -139,19 +159,28 @@ public class AdminGroupController {
     public Mono<ResponseEntity<BlueGreenStatus>> configureBlueGreen(
             @PathVariable String code, @RequestBody BlueGreenConfig req, ServerWebExchange exchange) {
         return adminAuth.require(exchange, Permissions.GROUP_WRITE)
-            .then(groupRouteRepository.configureSlots(
-                    code, req.blueUri(), req.greenUri(),
-                    LocalDateTime.now(), adminAuth.currentUser(exchange))
-                .filter(rows -> rows > 0)
-                .switchIfEmpty(Mono.error(new RuntimeException("Group not found: " + code)))
-                .flatMap(r -> groupRouteRepository.findByCode(code))
-                .map(g -> {
-                    gatewayRouteService.refreshRoutes();
-                    return ResponseEntity.ok(new BlueGreenStatus(
-                        g.getCode(), g.getBlueUri(), g.getGreenUri(),
-                        g.getActiveSlot() != null ? g.getActiveSlot() : "BLUE",
-                        g.resolvedUri()));
-                }));
+            .then(Mono.defer(() -> {
+                try {
+                    if (req.blueUri()  != null) SsrfGuard.assertSafeUri(req.blueUri());
+                    if (req.greenUri() != null) SsrfGuard.assertSafeUri(req.greenUri());
+                } catch (IllegalArgumentException e) {
+                    return Mono.error(new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST, "Invalid upstream URI: " + e.getMessage()));
+                }
+                return groupRouteRepository.configureSlots(
+                        code, req.blueUri(), req.greenUri(),
+                        LocalDateTime.now(), adminAuth.currentUser(exchange))
+                    .filter(rows -> rows > 0)
+                    .switchIfEmpty(Mono.error(new RuntimeException("Group not found: " + code)))
+                    .flatMap(r -> groupRouteRepository.findByCode(code))
+                    .map(g -> {
+                        gatewayRouteService.refreshRoutes();
+                        return ResponseEntity.ok(new BlueGreenStatus(
+                            g.getCode(), g.getBlueUri(), g.getGreenUri(),
+                            g.getActiveSlot() != null ? g.getActiveSlot() : "BLUE",
+                            g.resolvedUri()));
+                    });
+            }));
     }
 
     @PostMapping("/{code}/swap")

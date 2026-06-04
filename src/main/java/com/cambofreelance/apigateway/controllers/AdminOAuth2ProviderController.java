@@ -5,10 +5,12 @@ import com.cambofreelance.apigateway.constants.Constants;
 import com.cambofreelance.apigateway.constants.Permissions;
 import com.cambofreelance.apigateway.models.OAuth2Provider;
 import com.cambofreelance.apigateway.repositories.OAuth2ProviderRepository;
+import com.cambofreelance.apigateway.utils.SsrfGuard;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
@@ -35,32 +37,48 @@ public class AdminOAuth2ProviderController {
     @PostMapping
     public Mono<ResponseEntity<OAuth2Provider>> create(@RequestBody OAuth2Provider body, ServerWebExchange exchange) {
         return adminAuth.require(exchange, Permissions.SECURITY_WRITE)
-            .then(Mono.fromSupplier(() -> {
+            .then(Mono.defer(() -> {
+                try {
+                    SsrfGuard.assertSafeUri(body.getIntrospectionUri());
+                } catch (IllegalArgumentException e) {
+                    return Mono.error(new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST, "Invalid introspection_uri: " + e.getMessage()));
+                }
                 body.setId(null);
                 body.setStatus(Constants.STATUS_ACTIVE);
                 body.setCreatedAt(LocalDateTime.now());
                 body.setCreatedBy(adminAuth.currentUser(exchange));
-                return body;
-            }).flatMap(repository::save)
-                .map(r -> ResponseEntity.status(HttpStatus.CREATED).body(r)));
+                return repository.save(body)
+                    .map(r -> ResponseEntity.status(HttpStatus.CREATED).body(r));
+            }));
     }
 
     @PutMapping("/{id}")
     public Mono<ResponseEntity<OAuth2Provider>> update(
             @PathVariable Long id, @RequestBody OAuth2Provider body, ServerWebExchange exchange) {
         return adminAuth.require(exchange, Permissions.SECURITY_WRITE)
-            .then(repository.findById(id)
-                .flatMap(existing -> {
-                    if (body.getName()             != null) existing.setName(body.getName());
-                    if (body.getIntrospectionUri() != null) existing.setIntrospectionUri(body.getIntrospectionUri());
-                    if (body.getClientId()         != null) existing.setClientId(body.getClientId());
-                    if (body.getClientSecret()     != null) existing.setClientSecret(body.getClientSecret());
-                    existing.setUpdatedAt(LocalDateTime.now());
-                    existing.setUpdatedBy(adminAuth.currentUser(exchange));
-                    return repository.save(existing);
-                })
-                .map(ResponseEntity::ok)
-                .defaultIfEmpty(ResponseEntity.<OAuth2Provider>notFound().build()));
+            .then(Mono.defer(() -> {
+                if (body.getIntrospectionUri() != null) {
+                    try {
+                        SsrfGuard.assertSafeUri(body.getIntrospectionUri());
+                    } catch (IllegalArgumentException e) {
+                        return Mono.error(new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST, "Invalid introspection_uri: " + e.getMessage()));
+                    }
+                }
+                return repository.findById(id)
+                    .flatMap(existing -> {
+                        if (body.getName()             != null) existing.setName(body.getName());
+                        if (body.getIntrospectionUri() != null) existing.setIntrospectionUri(body.getIntrospectionUri());
+                        if (body.getClientId()         != null) existing.setClientId(body.getClientId());
+                        if (body.getClientSecret()     != null) existing.setClientSecret(body.getClientSecret());
+                        existing.setUpdatedAt(LocalDateTime.now());
+                        existing.setUpdatedBy(adminAuth.currentUser(exchange));
+                        return repository.save(existing);
+                    })
+                    .map(ResponseEntity::ok)
+                    .defaultIfEmpty(ResponseEntity.<OAuth2Provider>notFound().build());
+            }));
     }
 
     @DeleteMapping("/{id}")
