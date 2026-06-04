@@ -16,7 +16,7 @@ import reactor.core.scheduler.Schedulers;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/admin/metrics")
+@RequestMapping("/api/management/admin/metrics")
 @RequiredArgsConstructor
 public class AdminMetricsController {
 

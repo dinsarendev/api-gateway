@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/admin/audit-logs")
+@RequestMapping("/api/management/admin/audit-logs")
 @RequiredArgsConstructor
 public class AdminAuditLogController {
 
