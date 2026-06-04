@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/management/admin/incidents")
+@RequestMapping("/admin/incidents")
 @RequiredArgsConstructor
 public class AdminIncidentController {
 

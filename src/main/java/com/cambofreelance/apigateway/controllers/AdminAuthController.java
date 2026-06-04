@@ -17,7 +17,7 @@ import reactor.core.publisher.Mono;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/management/admin/auth")
+@RequestMapping("/admin/auth")
 @RequiredArgsConstructor
 public class AdminAuthController {
 

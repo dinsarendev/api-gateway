@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/management/admin/routes")
+@RequestMapping("/admin/routes")
 @RequiredArgsConstructor
 public class AdminRouteController {
 

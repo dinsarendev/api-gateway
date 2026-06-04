@@ -21,7 +21,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/api/management/admin/dashboard")
+@RequestMapping("/admin/dashboard")
 @RequiredArgsConstructor
 public class AdminDashboardController {
 

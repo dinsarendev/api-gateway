@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/management/admin/roles")
+@RequestMapping("/admin/roles")
 @RequiredArgsConstructor
 public class AdminRoleController {
 

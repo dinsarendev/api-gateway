@@ -22,7 +22,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/api/management/admin/health")
+@RequestMapping("/admin/health")
 @RequiredArgsConstructor
 public class InstanceHealthController {
 

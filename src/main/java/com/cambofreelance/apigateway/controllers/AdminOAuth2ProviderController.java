@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/management/admin/oauth2-providers")
+@RequestMapping("/admin/oauth2-providers")
 @RequiredArgsConstructor
 public class AdminOAuth2ProviderController {
 

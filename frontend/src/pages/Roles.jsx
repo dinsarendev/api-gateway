@@ -10,16 +10,13 @@ const EMPTY_FORM = { name: '', description: '', permissionIds: [] };
 
 // ── Permission group labels ────────────────────────────────────────────────
 const PERM_GROUPS = {
-  ROUTE:     ['ROUTE_READ',    'ROUTE_WRITE'],
-  GROUP:     ['GROUP_READ',    'GROUP_WRITE'],
-  REGISTRY:  ['REGISTRY_READ', 'REGISTRY_WRITE'],
-  HEALTH:    ['HEALTH_READ'],
-  SECURITY:  ['SECURITY_READ', 'SECURITY_WRITE'],
-  USER:      ['USER_READ',     'USER_WRITE'],
-  ROLE:      ['ROLE_READ',     'ROLE_WRITE'],
-  MONITORING: ['MONITORING_READ'],
-  INCIDENT:  ['INCIDENT_READ', 'INCIDENT_WRITE'],
-  AUDIT_LOG: ['AUDIT_LOG_READ'],
+  ROUTE:    ['ROUTE_READ',    'ROUTE_WRITE'],
+  GROUP:    ['GROUP_READ',    'GROUP_WRITE'],
+  REGISTRY: ['REGISTRY_READ', 'REGISTRY_WRITE'],
+  HEALTH:   ['HEALTH_READ'],
+  SECURITY: ['SECURITY_READ', 'SECURITY_WRITE'],
+  USER:     ['USER_READ',     'USER_WRITE'],
+  ROLE:     ['ROLE_READ',     'ROLE_WRITE'],
 };
 
 // ── Pagination ─────────────────────────────────────────────────────────────
