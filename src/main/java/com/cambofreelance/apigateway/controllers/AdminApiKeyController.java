@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/admin/api-keys")
+@RequestMapping("/api/management/admin/api-keys")
 @RequiredArgsConstructor
 public class AdminApiKeyController {
 

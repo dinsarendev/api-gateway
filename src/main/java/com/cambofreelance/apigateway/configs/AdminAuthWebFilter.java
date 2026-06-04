@@ -25,8 +25,8 @@ import java.util.Set;
 public class AdminAuthWebFilter implements WebFilter {
 
     private static final Set<String> PUBLIC_PATHS = Set.of(
-        "/admin/auth/login",
-        "/admin/auth/refresh"
+        "/api/management/admin/auth/login",
+        "/api/management/admin/auth/refresh"
     );
 
     private final JwtUtils jwtUtils;
@@ -36,8 +36,8 @@ public class AdminAuthWebFilter implements WebFilter {
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
         String path = exchange.getRequest().getPath().value();
 
-        // Only intercept /admin/** — let static assets and proxied routes through
-        if (!path.startsWith("/admin/")) {
+        // Only intercept /api/management/admin/** — let static assets and proxied routes through
+        if (!path.startsWith("/api/management/admin/")) {
             return chain.filter(exchange);
         }
 

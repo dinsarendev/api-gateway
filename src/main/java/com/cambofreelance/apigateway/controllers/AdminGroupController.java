@@ -26,7 +26,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/admin/groups")
+@RequestMapping("/api/management/admin/groups")
 @RequiredArgsConstructor
 public class AdminGroupController {
 

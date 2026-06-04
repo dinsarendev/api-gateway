@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/admin/ip-acl")
+@RequestMapping("/api/management/admin/ip-acl")
 @RequiredArgsConstructor
 public class AdminIpAclController {
 

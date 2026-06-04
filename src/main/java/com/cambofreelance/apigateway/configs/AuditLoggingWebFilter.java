@@ -38,7 +38,7 @@ public class AuditLoggingWebFilter implements WebFilter {
     public static final String ATTR_OLD_VALUE = "auditOldValue";
     public static final String ATTR_NEW_VALUE = "auditNewValue";
 
-    private static final Pattern ENTITY_ID_PATTERN = Pattern.compile("/admin/[^/]+/(\\d+)");
+    private static final Pattern ENTITY_ID_PATTERN = Pattern.compile("/api/management/admin/[^/]+/(\\d+)");
     private static final Set<String> AUDITED_METHODS = Set.of("POST", "PUT", "PATCH", "DELETE");
     private static final Set<String> BODY_METHODS    = Set.of("POST", "PUT", "PATCH");
 
@@ -71,7 +71,7 @@ public class AuditLoggingWebFilter implements WebFilter {
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
         String path = exchange.getRequest().getPath().value();
 
-        if (!path.startsWith("/admin/") || path.startsWith("/admin/audit-logs")) {
+        if (!path.startsWith("/api/management/admin/") || path.startsWith("/api/management/admin/audit-logs")) {
             return chain.filter(exchange);
         }
 
@@ -198,7 +198,7 @@ public class AuditLoggingWebFilter implements WebFilter {
     // ── Helpers ──────────────────────────────────────────────────────────────────
 
     private String resolveModule(String path) {
-        String[] segments = path.substring("/admin/".length()).split("/");
+        String[] segments = path.substring("/api/management/admin/".length()).split("/");
         if (segments.length == 0 || segments[0].isBlank()) return "ADMIN";
         return switch (segments[0]) {
             case "routes"           -> "ROUTE";
