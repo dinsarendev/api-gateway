@@ -24,6 +24,9 @@ public record RouteApiRequest(
     @JsonProperty("api_type")              String apiType,
     String                                 version,
     String                                 deprecated,
-    @JsonProperty("sunset_date")           LocalDateTime sunsetDate
+    @JsonProperty("sunset_date")           LocalDateTime sunsetDate,
+    String                                 tags,
+    @JsonProperty("sla_tier")              String slaTier,
+    String                                 documentation
 ) {}
 

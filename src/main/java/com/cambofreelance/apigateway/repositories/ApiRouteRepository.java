@@ -85,6 +85,9 @@ public interface ApiRouteRepository extends R2dbcRepository<ApiRoute, Long> {
                version                = :version,
                deprecated             = :deprecated,
                sunset_date            = :sunsetDate,
+               tags                   = :tags,
+               sla_tier               = :slaTier,
+               documentation          = :documentation,
                updated_at             = :updatedAt,
                updated_by             = :updatedBy
          WHERE id = :id
@@ -98,7 +101,30 @@ public interface ApiRouteRepository extends R2dbcRepository<ApiRoute, Long> {
                               String authType, String requiredRoles, String requiredPermissions,
                               String apiType,
                               String version, String deprecated, LocalDateTime sunsetDate,
+                              String tags, String slaTier, String documentation,
                               LocalDateTime updatedAt, String updatedBy);
+
+    @Modifying
+    @Query("""
+        UPDATE public.api_route
+           SET status           = 'PENDING',
+               rejection_reason = NULL,
+               updated_at       = :updatedAt,
+               updated_by       = :updatedBy
+         WHERE id = :id AND status = 'DRAFT'
+        """)
+    Mono<Integer> submitRoute(Long id, LocalDateTime updatedAt, String updatedBy);
+
+    @Modifying
+    @Query("""
+        UPDATE public.api_route
+           SET status           = 'DRAFT',
+               rejection_reason = :reason,
+               updated_at       = :updatedAt,
+               updated_by       = :updatedBy
+         WHERE id = :id AND status = 'PENDING'
+        """)
+    Mono<Integer> rejectRoute(Long id, String reason, LocalDateTime updatedAt, String updatedBy);
 
     @Modifying
     @Query("""

@@ -26,6 +26,7 @@ public class AdminSeeder {
     private static final List<String[]> DEFAULT_PERMISSIONS = List.of(
         new String[]{"ROUTE_READ",       "View routes"},
         new String[]{"ROUTE_WRITE",      "Create / update / delete routes"},
+        new String[]{"ROUTE_APPROVE",    "Approve or reject route submissions"},
         new String[]{"GROUP_READ",       "View service groups"},
         new String[]{"GROUP_WRITE",      "Create / update / delete groups"},
         new String[]{"REGISTRY_READ",    "View service registry"},
@@ -69,7 +70,7 @@ public class AdminSeeder {
             // ── 4. Upsert OPERATOR role + permissions ─────────────────────────
             AdminRole operator = upsertRole("OPERATOR", "Manage routes and groups, read-only on security");
             List<String> operatorPerms = List.of(
-                "ROUTE_READ", "ROUTE_WRITE", "GROUP_READ", "GROUP_WRITE",
+                "ROUTE_READ", "ROUTE_WRITE", "ROUTE_APPROVE", "GROUP_READ", "GROUP_WRITE",
                 "REGISTRY_READ", "HEALTH_READ", "SECURITY_READ",
                 "ROLE_READ", "MONITORING_READ", "INCIDENT_READ", "INCIDENT_WRITE", "AUDIT_LOG_READ"
             );

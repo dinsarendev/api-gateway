@@ -32,4 +32,10 @@ public interface ApiRouteService {
     Mono<Void> undeprecate(Long id);
 
     Mono<Void> retire(Long id);
+
+    Mono<Void> submit(Long id);
+
+    Mono<Void> approve(Long id);
+
+    Mono<Void> reject(Long id, String reason);
 }

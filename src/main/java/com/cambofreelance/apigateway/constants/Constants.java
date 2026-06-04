@@ -4,8 +4,17 @@ public final class Constants {
   public static final String SUCCESS        = "SUCCESS";
   public static final String BEARER        = "Bearer ";
   public static final String STATUS_ACTIVE     = "ACT";
+  public static final String STATUS_INACT      = "INACT";
+  public static final String STATUS_DRAFT      = "DRAFT";
+  public static final String STATUS_PENDING    = "PENDING";
   public static final String STATUS_DEPRECATED = "DEPRECATED";
   public static final String STATUS_RETIRED    = "RETIRED";
+
+  // SLA tiers
+  public static final String SLA_BASIC    = "BASIC";
+  public static final String SLA_STANDARD = "STANDARD";
+  public static final String SLA_PREMIUM  = "PREMIUM";
+  public static final String SLA_CRITICAL = "CRITICAL";
   public static final String SYSTEM        = "SYS";
   public static final String LANG_KH       = "km";
   public static final String LANG_CN       = "cn";

@@ -10,10 +10,15 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 3000,
       proxy: {
-        '/api/management': {
+        '/admin': {
           target: env.API_URL || 'http://localhost:25010',
           changeOrigin: true,
+          rewrite: path => '/api/management' + path,
         },
+        // '/api/management': {
+        //   target: env.API_URL || 'http://localhost:25010',
+        //   changeOrigin: true,
+        // },
       },
     },
     build: {

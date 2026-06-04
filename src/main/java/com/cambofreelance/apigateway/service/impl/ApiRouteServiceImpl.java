@@ -71,6 +71,7 @@ public class ApiRouteServiceImpl implements ApiRouteService {
                      start_time, end_time,
                      auth_type, required_roles, required_permissions,
                      api_type, version, deprecated, sunset_date,
+                     tags, sla_tier, documentation,
                      status, created_at, created_by)
                 VALUES
                     (:groupCode, :path, :method, :description, :applicationId,
@@ -79,7 +80,8 @@ public class ApiRouteServiceImpl implements ApiRouteService {
                      :startTime, :endTime,
                      :authType, :requiredRoles, :requiredPermissions,
                      :apiType, :version, :deprecated, :sunsetDate,
-                     'ACT', NOW(), :createdBy)
+                     :tags, :slaTier, :documentation,
+                     'DRAFT', NOW(), :createdBy)
                 RETURNING id
                 """)
             .bind("groupCode",            orEmpty(req.groupCode()))
@@ -102,12 +104,14 @@ public class ApiRouteServiceImpl implements ApiRouteService {
             .bind("version",              req.version() != null ? req.version() : Parameters.in(String.class))
             .bind("deprecated",           orEmpty(req.deprecated(), "N"))
             .bind("sunsetDate",           req.sunsetDate() != null ? req.sunsetDate() : Parameters.in(LocalDateTime.class))
+            .bind("tags",                 req.tags() != null ? req.tags() : Parameters.in(String.class))
+            .bind("slaTier",              req.slaTier() != null ? req.slaTier() : Constants.SLA_STANDARD)
+            .bind("documentation",        req.documentation() != null ? req.documentation() : Parameters.in(String.class))
             .bind("createdBy",            ADMIN)
             .map(row -> row.get("id", Long.class))
             .first()
             .flatMap(apiRouteRepository::findByIdWithUri)
             .map(this::toResponse)
-            .doOnSuccess(r -> refreshAll())
             .onErrorMap(e -> !(e instanceof RouteCreationException), e -> {
                 log.error("Failed to create route: {}", e.getMessage());
                 return new RouteCreationException("Failed to create route: " + e.getMessage());
@@ -142,6 +146,9 @@ public class ApiRouteServiceImpl implements ApiRouteService {
                 req.version()              != null ? req.version()              : existing.getVersion(),
                 orEmpty(req.deprecated(),           existing.getDeprecated()),
                 req.sunsetDate()           != null ? req.sunsetDate()           : existing.getSunsetDate(),
+                req.tags()                 != null ? req.tags()                 : existing.getTags(),
+                req.slaTier()              != null ? req.slaTier()              : existing.getSlaTier(),
+                req.documentation()        != null ? req.documentation()        : existing.getDocumentation(),
                 LocalDateTime.now(), ADMIN
             ))
             .filter(rows -> rows > 0)
@@ -183,7 +190,15 @@ public class ApiRouteServiceImpl implements ApiRouteService {
 
     @Override
     public Mono<Void> enable(Long id) {
-        return apiRouteRepository.updateStatus(id, Constants.STATUS_ACTIVE, LocalDateTime.now(), ADMIN)
+        return apiRouteRepository.findByIdWithUri(id)
+            .switchIfEmpty(Mono.error(new RouteNotFoundException("Route not found: " + id)))
+            .flatMap(route -> {
+                if (!Constants.STATUS_INACT.equals(route.getStatus())) {
+                    return Mono.error(new RouteCreationException(
+                        "Only INACT routes can be enabled (current: " + route.getStatus() + ")"));
+                }
+                return apiRouteRepository.updateStatus(id, Constants.STATUS_ACTIVE, LocalDateTime.now(), ADMIN);
+            })
             .filter(rows -> rows > 0)
             .switchIfEmpty(Mono.error(new RouteNotFoundException("Route not found: " + id)))
             .doOnSuccess(r -> refreshAll())
@@ -196,6 +211,60 @@ public class ApiRouteServiceImpl implements ApiRouteService {
             .filter(rows -> rows > 0)
             .switchIfEmpty(Mono.error(new RouteNotFoundException("Route not found: " + id)))
             .doOnSuccess(r -> refreshAll())
+            .then();
+    }
+
+    // ── Approval workflow ─────────────────────────────────────────────────────
+
+    @Override
+    public Mono<Void> submit(Long id) {
+        return apiRouteRepository.findByIdWithUri(id)
+            .switchIfEmpty(Mono.error(new RouteNotFoundException("Route not found: " + id)))
+            .flatMap(route -> {
+                if (!Constants.STATUS_DRAFT.equals(route.getStatus())) {
+                    return Mono.error(new RouteCreationException(
+                        "Only DRAFT routes can be submitted (current: " + route.getStatus() + ")"));
+                }
+                return apiRouteRepository.submitRoute(id, LocalDateTime.now(), ADMIN);
+            })
+            .filter(rows -> rows > 0)
+            .switchIfEmpty(Mono.error(new RouteNotFoundException("Route not found: " + id)))
+            .then();
+    }
+
+    @Override
+    public Mono<Void> approve(Long id) {
+        return apiRouteRepository.findByIdWithUri(id)
+            .switchIfEmpty(Mono.error(new RouteNotFoundException("Route not found: " + id)))
+            .flatMap(route -> {
+                if (!Constants.STATUS_PENDING.equals(route.getStatus())) {
+                    return Mono.error(new RouteCreationException(
+                        "Only PENDING routes can be approved (current: " + route.getStatus() + ")"));
+                }
+                return apiRouteRepository.updateStatus(id, Constants.STATUS_ACTIVE, LocalDateTime.now(), ADMIN);
+            })
+            .filter(rows -> rows > 0)
+            .switchIfEmpty(Mono.error(new RouteNotFoundException("Route not found: " + id)))
+            .doOnSuccess(r -> refreshAll())
+            .then();
+    }
+
+    @Override
+    public Mono<Void> reject(Long id, String reason) {
+        if (reason == null || reason.isBlank()) {
+            return Mono.error(new RouteCreationException("Rejection reason is required"));
+        }
+        return apiRouteRepository.findByIdWithUri(id)
+            .switchIfEmpty(Mono.error(new RouteNotFoundException("Route not found: " + id)))
+            .flatMap(route -> {
+                if (!Constants.STATUS_PENDING.equals(route.getStatus())) {
+                    return Mono.error(new RouteCreationException(
+                        "Only PENDING routes can be rejected (current: " + route.getStatus() + ")"));
+                }
+                return apiRouteRepository.rejectRoute(id, reason, LocalDateTime.now(), ADMIN);
+            })
+            .filter(rows -> rows > 0)
+            .switchIfEmpty(Mono.error(new RouteNotFoundException("Route not found: " + id)))
             .then();
     }
 
@@ -290,7 +359,8 @@ public class ApiRouteServiceImpl implements ApiRouteService {
             r.getUpdatedBy(), r.getUpdatedAt(),
             r.getAuthType(), r.getRequiredRoles(), r.getRequiredPermissions(),
             r.getApiType(),
-            r.getVersion(), r.getDeprecated(), r.getSunsetDate()
+            r.getVersion(), r.getDeprecated(), r.getSunsetDate(),
+            r.getTags(), r.getSlaTier(), r.getDocumentation(), r.getRejectionReason()
         );
     }
 

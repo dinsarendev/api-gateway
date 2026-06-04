@@ -84,6 +84,9 @@ public class RouteLocatorDetail implements RouteLocator {
                             c.setFallbackUri("forward:/fallback/" + apiRoute.getGroupCode());
                         });
                     }
+                    if (StringUtils.isNotBlank(apiRoute.getVersion())) {
+                        f.addResponseHeader("X-API-Version", apiRoute.getVersion());
+                    }
                     if (Constants.YES.equalsIgnoreCase(apiRoute.getDeprecated())) {
                         f.addResponseHeader("Deprecation", "true");
                         if (apiRoute.getSunsetDate() != null) {

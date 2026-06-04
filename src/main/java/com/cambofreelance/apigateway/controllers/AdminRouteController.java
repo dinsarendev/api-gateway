@@ -4,6 +4,7 @@ import com.cambofreelance.apigateway.configs.AdminAuthHelper;
 import com.cambofreelance.apigateway.constants.Constants;
 import com.cambofreelance.apigateway.constants.Permissions;
 import com.cambofreelance.apigateway.dto.DeprecateRouteRequest;
+import com.cambofreelance.apigateway.dto.RejectRouteRequest;
 import com.cambofreelance.apigateway.dto.RouteApiRequest;
 import com.cambofreelance.apigateway.dto.RouteApiResponse;
 import com.cambofreelance.apigateway.service.ApiRouteService;
@@ -83,6 +84,34 @@ public class AdminRouteController {
         return adminAuth.require(exchange, Permissions.ROUTE_WRITE)
             .then(apiRouteService.delete(id)
                 .thenReturn(ResponseEntity.ok(Map.<String, Object>of("id", id, "message", "Route deleted"))));
+    }
+
+    @PostMapping("/{id}/submit")
+    public Mono<ResponseEntity<Map<String, Object>>> submit(@PathVariable Long id, ServerWebExchange exchange) {
+        return adminAuth.require(exchange, Permissions.ROUTE_WRITE)
+            .then(apiRouteService.submit(id)
+                .thenReturn(ResponseEntity.ok(Map.<String, Object>of(
+                    "id", id, "status", Constants.STATUS_PENDING,
+                    "message", "Route submitted for approval"))));
+    }
+
+    @PostMapping("/{id}/approve")
+    public Mono<ResponseEntity<Map<String, Object>>> approve(@PathVariable Long id, ServerWebExchange exchange) {
+        return adminAuth.require(exchange, Permissions.ROUTE_APPROVE)
+            .then(apiRouteService.approve(id)
+                .thenReturn(ResponseEntity.ok(Map.<String, Object>of(
+                    "id", id, "status", Constants.STATUS_ACTIVE,
+                    "message", "Route approved and live"))));
+    }
+
+    @PostMapping("/{id}/reject")
+    public Mono<ResponseEntity<Map<String, Object>>> reject(
+            @PathVariable Long id, @RequestBody RejectRouteRequest request, ServerWebExchange exchange) {
+        return adminAuth.require(exchange, Permissions.ROUTE_APPROVE)
+            .then(apiRouteService.reject(id, request.reason())
+                .thenReturn(ResponseEntity.ok(Map.<String, Object>of(
+                    "id", id, "status", Constants.STATUS_DRAFT,
+                    "message", "Route rejected"))));
     }
 
     @PutMapping("/{id}/deprecate")

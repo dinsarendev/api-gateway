@@ -90,6 +90,29 @@ CREATE INDEX IF NOT EXISTS idx_api_route_sunset
     ON public.api_route (sunset_date)
     WHERE status = 'DEPRECATED' AND sunset_date IS NOT NULL;
 
+-- ── Governance columns ─────────────────────────────────────────────────────────
+-- api_route.status full lifecycle:
+--   DRAFT      → created but not yet submitted for approval
+--   PENDING    → submitted, awaiting ROUTE_APPROVE decision
+--   ACT        → approved and live
+--   DEPRECATED → live with Deprecation/Sunset headers
+--   RETIRED    → removed from gateway (end-of-life)
+--   INACT      → administratively disabled
+
+ALTER TABLE public.api_route
+    ADD COLUMN IF NOT EXISTS tags             varchar(500) NULL,
+    ADD COLUMN IF NOT EXISTS sla_tier         varchar(20)  NOT NULL DEFAULT 'STANDARD',
+    ADD COLUMN IF NOT EXISTS documentation    text         NULL,
+    ADD COLUMN IF NOT EXISTS rejection_reason text         NULL;
+
+COMMENT ON COLUMN public.api_route.tags             IS 'Comma-separated policy labels: PII, SENSITIVE, INTERNAL, BETA, PUBLIC_API';
+COMMENT ON COLUMN public.api_route.sla_tier         IS 'BASIC | STANDARD | PREMIUM | CRITICAL — expected service tier';
+COMMENT ON COLUMN public.api_route.documentation    IS 'Markdown documentation for this API route';
+COMMENT ON COLUMN public.api_route.rejection_reason IS 'Reason set by approver when rejecting a PENDING route';
+
+CREATE INDEX IF NOT EXISTS idx_api_route_status ON public.api_route (status);
+CREATE INDEX IF NOT EXISTS idx_api_route_sla    ON public.api_route (sla_tier);
+
 -- ── Blue-Green deployment support on api_group_route ─────────────────────────
 ALTER TABLE public.api_group_route
     ADD COLUMN IF NOT EXISTS blue_uri    varchar(255) NULL,

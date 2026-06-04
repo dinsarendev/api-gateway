@@ -7,6 +7,7 @@ const AuthContext = createContext(null);
 export const PERMS = {
   ROUTE_READ:    'ROUTE_READ',
   ROUTE_WRITE:   'ROUTE_WRITE',
+  ROUTE_APPROVE: 'ROUTE_APPROVE',
   GROUP_READ:    'GROUP_READ',
   GROUP_WRITE:   'GROUP_WRITE',
   REGISTRY_READ: 'REGISTRY_READ',

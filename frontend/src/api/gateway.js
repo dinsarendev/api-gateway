@@ -52,6 +52,9 @@ export const API = {
   deprecateRoute:  (id, data)     => put(`/admin/routes/${id}/deprecate`, data),
   undeprecateRoute:(id)           => put(`/admin/routes/${id}/undeprecate`),
   retireRoute:     (id)           => put(`/admin/routes/${id}/retire`),
+  submitRoute:     (id)           => post(`/admin/routes/${id}/submit`),
+  approveRoute:    (id)           => post(`/admin/routes/${id}/approve`),
+  rejectRoute:     (id, data)     => post(`/admin/routes/${id}/reject`, data),
   reloadRoutes:    ()             => post('/admin/routes/reload'),
 
   // ── Groups ────────────────────────────────────────────────────────────────

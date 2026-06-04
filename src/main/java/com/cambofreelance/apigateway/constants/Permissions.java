@@ -7,6 +7,7 @@ public final class Permissions {
     // ── Routes ────────────────────────────────────────────────────────────────
     public static final String ROUTE_READ    = "ROUTE_READ";
     public static final String ROUTE_WRITE   = "ROUTE_WRITE";
+    public static final String ROUTE_APPROVE = "ROUTE_APPROVE";
 
     // ── Groups ────────────────────────────────────────────────────────────────
     public static final String GROUP_READ    = "GROUP_READ";

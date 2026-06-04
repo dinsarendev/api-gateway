@@ -93,4 +93,16 @@ public class ApiRoute extends BaseEntity implements Serializable {
 
     @Column("sunset_date")
     private LocalDateTime sunsetDate;
+
+    @Column("tags")
+    private String tags;
+
+    @Column("sla_tier")
+    private String slaTier;
+
+    @Column("documentation")
+    private String documentation;
+
+    @Column("rejection_reason")
+    private String rejectionReason;
 }
