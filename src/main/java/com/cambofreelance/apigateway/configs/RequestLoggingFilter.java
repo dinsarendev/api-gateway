@@ -8,6 +8,7 @@ import com.cambofreelance.apigateway.constants.Constants;
 import com.cambofreelance.apigateway.constants.ErrorCode;
 import com.cambofreelance.apigateway.dto.ApiRouteDto;
 import com.cambofreelance.apigateway.exception.MessageResponse;
+import com.cambofreelance.apigateway.exception.RouteNotFoundException;
 import com.cambofreelance.apigateway.security.IpFilterService;
 import com.cambofreelance.apigateway.security.SecurityPrincipal;
 import com.cambofreelance.apigateway.security.SecurityService;
@@ -52,13 +53,13 @@ public class RequestLoggingFilter implements GlobalFilter {
                                 ObjectMapper objectMapper,
                                 Tracer tracer,
                                 MetricsCollector metricsCollector) {
-        this.rateLimiterService           = rateLimiterService;
-        this.apiRouteManagerRedisCache    = apiRouteManagerRedisCache;
-        this.securityService              = securityService;
-        this.ipFilterService              = ipFilterService;
-        this.objectMapper                 = objectMapper;
-        this.tracer                       = tracer;
-        this.metricsCollector             = metricsCollector;
+        this.rateLimiterService        = rateLimiterService;
+        this.apiRouteManagerRedisCache = apiRouteManagerRedisCache;
+        this.securityService           = securityService;
+        this.ipFilterService           = ipFilterService;
+        this.objectMapper              = objectMapper;
+        this.tracer                    = tracer;
+        this.metricsCollector          = metricsCollector;
     }
 
     @Override
@@ -76,43 +77,50 @@ public class RequestLoggingFilter implements GlobalFilter {
         String correlationId = resolveCorrelationId(request);
 
         log.info("Inbound: correlationId={}, method={}, path={}, ip={}", correlationId, method, path, clientIp);
-
         exchange.getResponse().getHeaders().set(Constants.CORRELATION_ID, correlationId);
 
-        // Resolve route — Redis first, in-memory fallback
-        ApiRouteDto routeDto = safeGetApiRouteFromRedis(path, method);
-        if (routeDto == null) {
-            routeDto = ApiRouteManagerCache.get(path, method);
-        }
-        if (routeDto == null) {
-            return errorResponse(exchange, HttpStatus.NOT_FOUND, ErrorCode.ERR_00404, "API route not found")
-                .doFinally(s -> metricsCollector.record(null, 404, elapsedMs(startNano), clientIp));
-        }
+        return resolveRoute(path, method)
+            .switchIfEmpty(Mono.error(new RouteNotFoundException("API route not found")))
+            .flatMap(routeDto -> {
+                if (!isRouteAvailableNow(routeDto)) {
+                    return Mono.error(new RouteNotFoundException("API route not found"));
+                }
+                return processRequest(exchange, chain, routeDto, startNano, clientIp, correlationId, request, method);
+            })
+            .onErrorResume(RouteNotFoundException.class, e ->
+                errorResponse(exchange, HttpStatus.NOT_FOUND, ErrorCode.ERR_00404, "API route not found")
+                    .doFinally(s -> metricsCollector.record(null, 404, elapsedMs(startNano), clientIp))
+            );
+    }
 
-        // Enforce time-window scheduling: reject requests outside [startTime, endTime]
-        if (!isRouteAvailableNow(routeDto)) {
-            return errorResponse(exchange, HttpStatus.NOT_FOUND, ErrorCode.ERR_00404, "API route not found")
-                .doFinally(s -> metricsCollector.record(null, 404, elapsedMs(startNano), clientIp));
-        }
+    // ── Route resolution: Redis (O(1) exact) → in-memory (path-var / wildcard) ──
 
-        final ApiRouteDto route = routeDto;
+    private Mono<ApiRouteDto> resolveRoute(String path, String method) {
+        return apiRouteManagerRedisCache.get(path, method)
+            .switchIfEmpty(Mono.defer(() -> {
+                ApiRouteDto cached = ApiRouteManagerCache.get(path, method);
+                return cached != null ? Mono.just(cached) : Mono.empty();
+            }));
+    }
 
-        // ── 1. IP filter (blacklist / whitelist) ───────────────────────────────
+    // ── Security / rate-limit chain ────────────────────────────────────────────
+
+    private Mono<Void> processRequest(ServerWebExchange exchange, GatewayFilterChain chain,
+                                      ApiRouteDto route, long startNano, String clientIp,
+                                      String correlationId, ServerHttpRequest request, String method) {
         return ipFilterService.isAllowed(clientIp, route)
             .flatMap(allowed -> {
                 if (Boolean.FALSE.equals(allowed)) {
-                    log.warn("IP blocked: {} → {} {}", clientIp, method, path);
+                    log.warn("IP blocked: {} → {} {}", clientIp, method, route.getPath());
                     return errorResponse(exchange, HttpStatus.FORBIDDEN, ErrorCode.ERR_00403,
                         "Access denied from IP: " + clientIp);
                 }
 
-                // ── 2. Public routes skip authentication ───────────────────────
                 if (Constants.YES.equalsIgnoreCase(route.getIsPublic())) {
                     ServerWebExchange out = withUpstreamHeaders(exchange, request, clientIp, correlationId, null, null);
                     return applyRateLimitOrContinue(out, chain, method, clientIp, route);
                 }
 
-                // ── 3. Authentication + RBAC / PBAC ────────────────────────────
                 return securityService.authenticate(exchange, route)
                     .flatMap(principal ->
                         securityService.checkRoles(principal, route)
@@ -139,6 +147,8 @@ public class RequestLoggingFilter implements GlobalFilter {
             });
     }
 
+    // ── Helpers ────────────────────────────────────────────────────────────────
+
     private long elapsedMs(long startNano) {
         return (System.nanoTime() - startNano) / 1_000_000;
     }
@@ -163,15 +173,13 @@ public class RequestLoggingFilter implements GlobalFilter {
             builder.header("X-User-Permissions", String.join(",", principal.permissions()));
         }
 
-        // Forward mTLS client cert CN if present
         var sslInfo = request.getSslInfo();
         if (sslInfo != null) {
             var certs = sslInfo.getPeerCertificates();
             if (certs != null && certs.length > 0) {
                 try {
                     java.security.cert.X509Certificate cert = (java.security.cert.X509Certificate) certs[0];
-                    builder.header("X-Client-Cert-CN",
-                        cert.getSubjectX500Principal().getName());
+                    builder.header("X-Client-Cert-CN", cert.getSubjectX500Principal().getName());
                 } catch (Exception ignored) {}
             }
         }
@@ -180,7 +188,7 @@ public class RequestLoggingFilter implements GlobalFilter {
     }
 
     private Mono<Void> applyRateLimitOrContinue(ServerWebExchange exchange, GatewayFilterChain chain,
-                                                 String method, String clientIp, ApiRouteDto routeConfig) {
+                                                  String method, String clientIp, ApiRouteDto routeConfig) {
         return rateLimiterService.isAllowed(method, clientIp, routeConfig)
             .flatMap(allowed -> {
                 if (Boolean.FALSE.equals(allowed)) {
@@ -204,15 +212,6 @@ public class RequestLoggingFilter implements GlobalFilter {
     private String resolveCorrelationId(ServerHttpRequest request) {
         String existing = request.getHeaders().getFirst(Constants.CORRELATION_ID);
         return StringUtils.isNotBlank(existing) ? existing : UUID.randomUUID().toString();
-    }
-
-    private ApiRouteDto safeGetApiRouteFromRedis(String path, String method) {
-        try {
-            return apiRouteManagerRedisCache.get(path, method);
-        } catch (Exception e) {
-            log.warn("Redis route lookup failed [{} {}]: {}", method, path, e.getMessage());
-            return null;
-        }
     }
 
     private Mono<Void> errorResponse(ServerWebExchange exchange, HttpStatus status, String errorCode, String message) {

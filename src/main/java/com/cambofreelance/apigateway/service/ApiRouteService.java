@@ -9,9 +9,9 @@ import java.time.LocalDateTime;
 
 public interface ApiRouteService {
 
-    Mono<RouteApiResponse> create(RouteApiRequest request);
+    Mono<RouteApiResponse> create(RouteApiRequest request, String actor);
 
-    Mono<RouteApiResponse> update(Long id, RouteApiRequest request);
+    Mono<RouteApiResponse> update(Long id, RouteApiRequest request, String actor);
 
     Flux<RouteApiResponse> findAll();
 
@@ -19,23 +19,23 @@ public interface ApiRouteService {
 
     Mono<RouteApiResponse> findById(Long id);
 
-    Mono<Void> delete(Long id);
+    Mono<Void> delete(Long id, String actor);
 
-    Mono<Void> enable(Long id);
+    Mono<Void> enable(Long id, String actor);
 
-    Mono<Void> disable(Long id);
+    Mono<Void> disable(Long id, String actor);
 
     Mono<Void> reloadRoutes();
 
-    Mono<Void> deprecate(Long id, LocalDateTime sunsetDate);
+    Mono<Void> deprecate(Long id, LocalDateTime sunsetDate, String actor);
 
-    Mono<Void> undeprecate(Long id);
+    Mono<Void> undeprecate(Long id, String actor);
 
-    Mono<Void> retire(Long id);
+    Mono<Void> retire(Long id, String actor);
 
-    Mono<Void> submit(Long id);
+    Mono<Void> submit(Long id, String actor);
 
-    Mono<Void> approve(Long id);
+    Mono<Void> approve(Long id, String actor);
 
-    Mono<Void> reject(Long id, String reason);
+    Mono<Void> reject(Long id, String reason, String actor);
 }

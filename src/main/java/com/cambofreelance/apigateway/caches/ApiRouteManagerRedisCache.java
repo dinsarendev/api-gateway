@@ -1,202 +1,101 @@
 package com.cambofreelance.apigateway.caches;
 
+import com.cambofreelance.apigateway.dto.ApiRouteDto;
 import jakarta.annotation.PostConstruct;
-import jakarta.annotation.Resource;
-import java.util.Comparator;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.ReactiveHashOperations;
+import org.springframework.data.redis.core.ReactiveRedisTemplate;
+import org.springframework.stereotype.Component;
+import reactor.core.publisher.Mono;
+
 import java.util.List;
 import java.util.Map;
-import com.cambofreelance.apigateway.dto.ApiRouteDto;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.RedisConnectionFailureException;
-import org.springframework.data.redis.core.HashOperations;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.stereotype.Repository;
+import java.util.stream.Collectors;
 
+/**
+ * Redis-backed route cache for O(1) exact-path lookups.
+ * Path-variable and wildcard routes are intentionally excluded — they cannot
+ * be looked up by exact key, so they are handled exclusively by the
+ * in-memory {@link ApiRouteManagerCache}.
+ */
 @Slf4j
-@Repository
+@Component
 public class ApiRouteManagerRedisCache {
 
     @Value("${storage.redis.key-api-route}")
     private String keyValue;
 
     private String KEY;
+    private ReactiveHashOperations<String, String, ApiRouteDto> hashOps;
 
-    private HashOperations<String, String, ApiRouteDto> hashOperations;
+    private final ReactiveRedisTemplate<String, ApiRouteDto> reactiveRedisTemplate;
 
-    @Resource(name = "apiRouteDtoRedisTemplate")
-    private RedisTemplate<String, ApiRouteDto> redisTemplate;
+    public ApiRouteManagerRedisCache(
+            @Qualifier("apiRouteDtoReactiveRedisTemplate")
+            ReactiveRedisTemplate<String, ApiRouteDto> reactiveRedisTemplate) {
+        this.reactiveRedisTemplate = reactiveRedisTemplate;
+    }
 
     @PostConstruct
     public void init() {
-        try {
-            KEY = keyValue;
-            hashOperations = redisTemplate.opsForHash();
-        } catch (RedisConnectionFailureException e) {
-            log.error("Redis init failed", e);
-        }
+        KEY = keyValue;
+        hashOps = reactiveRedisTemplate.opsForHash();
     }
 
-    private static final String SUFFIX_WILDCARDS = ":wildcards";
-    private static final String SUFFIX_PATH_VARS = ":path-variables";
+    // ── Init ──────────────────────────────────────────────────────────────────
 
-    // ================= INIT =================
     public void initCache(List<ApiRouteDto> routes) {
-        try {
-            redisTemplate.delete(KEY);
-            redisTemplate.delete(KEY + SUFFIX_WILDCARDS);
-            redisTemplate.delete(KEY + SUFFIX_PATH_VARS);
+        Map<String, ApiRouteDto> exactRoutes = routes.stream()
+            .filter(r -> !hasPathVariable(r.getPath()) && !r.getPath().endsWith("/**"))
+            .collect(Collectors.toMap(
+                r -> buildKey(r.getPath(), r.getMethod()),
+                r -> r,
+                (a, b) -> b
+            ));
 
-            for (ApiRouteDto route : routes) {
-                String hashKey = buildKey(route.getPath(), route.getMethod());
-                hashOperations.put(KEY, hashKey, route);
-
-                if (hasPathVariable(route.getPath())) {
-                    hashOperations.put(KEY + SUFFIX_PATH_VARS, hashKey, route);
-                } else if (route.getPath().endsWith("/**")) {
-                    hashOperations.put(KEY + SUFFIX_WILDCARDS, hashKey, route);
-                }
-            }
-
-            log.info("API Route cache initialized: {} records", routes.size());
-
-        } catch (Exception e) {
-            log.error("Init cache error", e);
-        }
+        reactiveRedisTemplate.delete(KEY)
+            .then(exactRoutes.isEmpty() ? Mono.just(Boolean.TRUE) : hashOps.putAll(KEY, exactRoutes))
+            .subscribe(
+                null,
+                e -> log.error("Route Redis cache init error: {}", e.getMessage()),
+                () -> log.info("Route Redis cache initialized: {} exact routes", exactRoutes.size())
+            );
     }
 
-    // ================= ADD / UPDATE =================
+    // ── Get — O(1) exact match only ────────────────────────────────────────────
+
+    public Mono<ApiRouteDto> get(String path, String method) {
+        return hashOps.get(KEY, buildKey(path, method))
+            .switchIfEmpty(hashOps.get(KEY, buildKey(path, "")));
+    }
+
+    // ── Put / Evict ────────────────────────────────────────────────────────────
+
     public void put(ApiRouteDto route) {
-        try {
-            String hashKey = buildKey(route.getPath(), route.getMethod());
-            hashOperations.put(KEY, hashKey, route);
-
-            if (hasPathVariable(route.getPath())) {
-                hashOperations.put(KEY + SUFFIX_PATH_VARS, hashKey, route);
-            } else if (route.getPath().endsWith("/**")) {
-                hashOperations.put(KEY + SUFFIX_WILDCARDS, hashKey, route);
-            }
-
-        } catch (Exception e) {
-            log.error("Put cache error", e);
+        if (hasPathVariable(route.getPath()) || route.getPath().endsWith("/**")) {
+            return;
         }
+        hashOps.put(KEY, buildKey(route.getPath(), route.getMethod()), route)
+            .subscribe(null, e -> log.warn("Route Redis cache put error: {}", e.getMessage()));
     }
 
-    public void evict(ApiRouteDto route) {
-        try {
-            String hashKey = buildKey(route.getPath(), route.getMethod());
-            hashOperations.delete(KEY, hashKey);
-
-            if (hasPathVariable(route.getPath())) {
-                hashOperations.delete(KEY + SUFFIX_PATH_VARS, hashKey);
-            } else if (route.getPath().endsWith("/**")) {
-                hashOperations.delete(KEY + SUFFIX_WILDCARDS, hashKey);
-            }
-
-        } catch (Exception e) {
-            log.error("Evict cache error", e);
+    public void evict(String path, String method) {
+        if (hasPathVariable(path) || path.endsWith("/**")) {
+            return;
         }
+        hashOps.remove(KEY, (Object) buildKey(path, method))
+            .subscribe(null, e -> log.warn("Route Redis cache evict error: {}", e.getMessage()));
     }
 
-    // ================= GET =================
-    public ApiRouteDto get(String path, String method) {
-        try {
-            // 1. Exact match for the specific method  O(1)
-            ApiRouteDto exact = hashOperations.get(KEY, buildKey(path, method));
-            // 1b. Fallback: any-method route (blank method = matches all HTTP methods)
-            if (exact == null) {
-                exact = hashOperations.get(KEY, buildKey(path, ""));
-            }
-            if (exact != null) return exact;
+    // ── Helpers ────────────────────────────────────────────────────────────────
 
-            // 2. Path variable match: /users/{id}, /items/{id}/details
-            Map<String, ApiRouteDto> pathVars = hashOperations.entries(KEY + SUFFIX_PATH_VARS);
-            ApiRouteDto pathVarMatch = pathVars.values().stream()
-                .filter(dto -> methodMatches(dto.getMethod(), method))
-                .filter(dto -> matchesPathVariable(dto.getPath(), path))
-                .max(Comparator.comparingInt(dto -> countLiteralSegments(dto.getPath())))
-                .orElse(null);
-            if (pathVarMatch != null) return pathVarMatch;
-
-            // 3. Wildcard match: /api/**
-            Map<String, ApiRouteDto> wildcards = hashOperations.entries(KEY + SUFFIX_WILDCARDS);
-            return wildcards.values().stream()
-                .filter(dto -> methodMatches(dto.getMethod(), method))
-                .filter(dto -> matchesWildcard(dto.getPath(), path))
-                .max(Comparator.comparingInt(dto -> dto.getPath().length()))
-                .orElse(null);
-
-        } catch (Exception e) {
-            log.error("Get cache error", e);
-            return null;
-        }
-    }
-
-    // ================= UTIL =================
-
-    /** Blank/null method = route accepts any HTTP method. */
-    private boolean methodMatches(String routeMethod, String incomingMethod) {
-        return routeMethod == null || routeMethod.isEmpty() || routeMethod.equalsIgnoreCase(incomingMethod);
-    }
-
-    /** Null-safe: a null/blank method produces a key ending with ":" */
     private String buildKey(String path, String method) {
         return path + ":" + (method != null ? method.toUpperCase() : "");
     }
 
     private boolean hasPathVariable(String path) {
         return path != null && path.contains("{");
-    }
-
-    /**
-     * Matches a request path against a path variable pattern.
-     * Segments in {curly braces} match any single path segment.
-     * A ** segment matches all remaining segments.
-     *
-     * Examples:
-     *   /users/{id}           vs /users/123        → true
-     *   /users/{id}/posts/**  vs /users/123/posts/1 → true
-     *   /users/{id}           vs /users/123/extra   → false
-     */
-    private boolean matchesPathVariable(String pattern, String requestPath) {
-        String[] patternSegs = pattern.split("/", -1);
-        String[] requestSegs = requestPath.split("/", -1);
-
-        for (int i = 0; i < patternSegs.length; i++) {
-            String ps = patternSegs[i];
-            if ("**".equals(ps)) return true;
-            if (i >= requestSegs.length) return false;
-            if (ps.startsWith("{") && ps.endsWith("}")) continue;
-            if (!ps.equals(requestSegs[i])) return false;
-        }
-
-        return patternSegs.length == requestSegs.length;
-    }
-
-    /**
-     * Matches a request path against a wildcard route pattern (/** suffix only).
-     * Requires a "/" boundary after the prefix to prevent false matches.
-     *
-     * Examples:
-     *   matchesWildcard("/api/users/**", "/api/users/123")  → true
-     *   matchesWildcard("/api/users/**", "/api/users")      → true
-     *   matchesWildcard("/api/users/**", "/api/usersfoo")   → false
-     */
-    private boolean matchesWildcard(String routePath, String requestPath) {
-        if (!routePath.endsWith("/**")) {
-            return false;
-        }
-        String prefix = routePath.substring(0, routePath.length() - 3);
-        return requestPath.equals(prefix) || requestPath.startsWith(prefix + "/");
-    }
-
-    private int countLiteralSegments(String path) {
-        int count = 0;
-        for (String seg : path.split("/", -1)) {
-            if (!seg.isEmpty() && !seg.startsWith("{") && !"**".equals(seg)) {
-                count++;
-            }
-        }
-        return count;
     }
 }

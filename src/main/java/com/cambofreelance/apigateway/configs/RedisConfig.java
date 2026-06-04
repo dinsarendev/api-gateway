@@ -89,6 +89,19 @@ public class RedisConfig {
     }
 
     @Bean
+    public ReactiveRedisTemplate<String, ApiRouteDto> apiRouteDtoReactiveRedisTemplate(
+            ReactiveRedisConnectionFactory connectionFactory) {
+        Jackson2JsonRedisSerializer<ApiRouteDto> serializer =
+            new Jackson2JsonRedisSerializer<>(objectMapper, ApiRouteDto.class);
+        RedisSerializationContext<String, ApiRouteDto> context =
+            RedisSerializationContext.<String, ApiRouteDto>newSerializationContext(new StringRedisSerializer())
+                .hashKey(new StringRedisSerializer())
+                .hashValue(serializer)
+                .build();
+        return new ReactiveRedisTemplate<>(connectionFactory, context);
+    }
+
+    @Bean
     public RedisTemplate<String, ApiRouteDto> apiRouteDtoRedisTemplate(
         RedisConnectionFactory connectionFactory) {
         RedisTemplate<String, ApiRouteDto> template = new RedisTemplate<>();

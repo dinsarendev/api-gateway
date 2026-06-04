@@ -2,6 +2,7 @@ package com.cambofreelance.apigateway.caches;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 import com.cambofreelance.apigateway.dto.ApiRouteDto;
 
@@ -111,6 +112,58 @@ public class ApiRouteManagerCache {
         return getAllRoutes().stream()
             .filter(r -> groupCode.equalsIgnoreCase(r.getGroupCode()))
             .toList();
+    }
+
+    // ================= PUT / EVICT =================
+
+    public static void put(ApiRouteDto route) {
+        String path = normalize(route.getPath());
+        route.setPath(path);
+        RouteHolder current = holder;
+
+        if (hasPathVariable(path)) {
+            String key = buildKey(path, route.getMethod());
+            List<ApiRouteDto> newList = new ArrayList<>(current.pathVariableList);
+            newList.removeIf(r -> buildKey(r.getPath(), r.getMethod()).equals(key));
+            newList.add(route);
+            newList.sort((a, b) -> countLiteralSegments(b.getPath()) - countLiteralSegments(a.getPath()));
+            holder = new RouteHolder(current.exactMap, Collections.unmodifiableList(newList), current.wildcardList);
+        } else if (isWildcard(path)) {
+            route.setPath(extractBasePath(path));
+            String basePath = route.getPath();
+            List<ApiRouteDto> newList = new ArrayList<>(current.wildcardList);
+            newList.removeIf(r -> r.getPath().equals(basePath) && Objects.equals(r.getMethod(), route.getMethod()));
+            newList.add(route);
+            newList.sort((a, b) -> b.getPath().length() - a.getPath().length());
+            holder = new RouteHolder(current.exactMap, current.pathVariableList, Collections.unmodifiableList(newList));
+        } else {
+            Map<String, ApiRouteDto> newMap = new ConcurrentHashMap<>(current.exactMap);
+            newMap.put(buildKey(path, route.getMethod()), route);
+            holder = new RouteHolder(newMap, current.pathVariableList, current.wildcardList);
+        }
+    }
+
+    public static void evict(String routePath, String method) {
+        String path = normalize(routePath);
+        RouteHolder current = holder;
+
+        if (hasPathVariable(path)) {
+            String key = buildKey(path, method);
+            List<ApiRouteDto> newList = current.pathVariableList.stream()
+                .filter(r -> !buildKey(r.getPath(), r.getMethod()).equals(key))
+                .collect(Collectors.toList());
+            holder = new RouteHolder(current.exactMap, Collections.unmodifiableList(newList), current.wildcardList);
+        } else if (isWildcard(path)) {
+            String basePath = extractBasePath(path);
+            List<ApiRouteDto> newList = current.wildcardList.stream()
+                .filter(r -> !(r.getPath().equals(basePath) && Objects.equals(r.getMethod(), method)))
+                .collect(Collectors.toList());
+            holder = new RouteHolder(current.exactMap, current.pathVariableList, Collections.unmodifiableList(newList));
+        } else {
+            Map<String, ApiRouteDto> newMap = new ConcurrentHashMap<>(current.exactMap);
+            newMap.remove(buildKey(path, method));
+            holder = new RouteHolder(newMap, current.pathVariableList, current.wildcardList);
+        }
     }
 
     // ================= GENERAL CACHE =================

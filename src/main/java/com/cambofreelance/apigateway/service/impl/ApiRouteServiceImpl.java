@@ -1,6 +1,9 @@
 package com.cambofreelance.apigateway.service.impl;
 
+import com.cambofreelance.apigateway.caches.ApiRouteManagerCache;
+import com.cambofreelance.apigateway.caches.ApiRouteManagerRedisCache;
 import com.cambofreelance.apigateway.constants.Constants;
+import com.cambofreelance.apigateway.dto.ApiRouteDto;
 import com.cambofreelance.apigateway.dto.RouteApiRequest;
 import com.cambofreelance.apigateway.dto.RouteApiResponse;
 import com.cambofreelance.apigateway.exception.RouteCreationException;
@@ -26,21 +29,16 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class ApiRouteServiceImpl implements ApiRouteService {
 
-    private static final String ADMIN = "admin";
-
     private final ApiRouteRepository apiRouteRepository;
     private final GatewayRouteService gatewayRouteService;
     private final ApiMigrateRegistry apiMigrateRegistry;
+    private final ApiRouteManagerRedisCache apiRouteManagerRedisCache;
     private final DatabaseClient databaseClient;
 
     // ── Create ────────────────────────────────────────────────────────────────
 
-    /**
-     * Inserts via raw SQL to avoid writing the JOIN-derived `uri` column,
-     * then re-fetches with the JOIN so the response includes the resolved URI.
-     */
     @Override
-    public Mono<RouteApiResponse> create(RouteApiRequest req) {
+    public Mono<RouteApiResponse> create(RouteApiRequest req, String actor) {
         if (StringUtils.isBlank(req.path())) {
             return Mono.error(new RouteCreationException("path is required"));
         }
@@ -58,11 +56,11 @@ public class ApiRouteServiceImpl implements ApiRouteService {
                     return Mono.error(new RouteCreationException(
                         "Active route already exists for path=" + req.path() + " method=[" + label + "]"));
                 }
-                return doCreate(req, normalizedMethod);
+                return doCreate(req, normalizedMethod, actor);
             });
     }
 
-    private Mono<RouteApiResponse> doCreate(RouteApiRequest req, String normalizedMethod) {
+    private Mono<RouteApiResponse> doCreate(RouteApiRequest req, String normalizedMethod, String actor) {
         return databaseClient.sql("""
                 INSERT INTO api_route
                     (group_code, path, method, description, application_id,
@@ -107,7 +105,7 @@ public class ApiRouteServiceImpl implements ApiRouteService {
             .bind("tags",                 req.tags() != null ? req.tags() : Parameters.in(String.class))
             .bind("slaTier",              req.slaTier() != null ? req.slaTier() : Constants.SLA_STANDARD)
             .bind("documentation",        req.documentation() != null ? req.documentation() : Parameters.in(String.class))
-            .bind("createdBy",            ADMIN)
+            .bind("createdBy",            actor)
             .map(row -> row.get("id", Long.class))
             .first()
             .flatMap(apiRouteRepository::findByIdWithUri)
@@ -121,7 +119,7 @@ public class ApiRouteServiceImpl implements ApiRouteService {
     // ── Update ────────────────────────────────────────────────────────────────
 
     @Override
-    public Mono<RouteApiResponse> update(Long id, RouteApiRequest req) {
+    public Mono<RouteApiResponse> update(Long id, RouteApiRequest req, String actor) {
         return apiRouteRepository.findByIdWithUri(id)
             .switchIfEmpty(Mono.error(new RouteNotFoundException("Route not found: " + id)))
             .flatMap(existing -> apiRouteRepository.updateRoute(
@@ -149,13 +147,20 @@ public class ApiRouteServiceImpl implements ApiRouteService {
                 req.tags()                 != null ? req.tags()                 : existing.getTags(),
                 req.slaTier()              != null ? req.slaTier()              : existing.getSlaTier(),
                 req.documentation()        != null ? req.documentation()        : existing.getDocumentation(),
-                LocalDateTime.now(), ADMIN
-            ))
+                LocalDateTime.now(), actor
+            )
             .filter(rows -> rows > 0)
             .switchIfEmpty(Mono.error(new RouteNotFoundException("Route not found: " + id)))
             .flatMap(r -> apiRouteRepository.findByIdWithUri(id))
-            .map(this::toResponse)
-            .doOnSuccess(r -> refreshAll());
+            .doOnNext(updated -> {
+                boolean wasLive = Constants.STATUS_ACTIVE.equals(existing.getStatus())
+                    || Constants.STATUS_DEPRECATED.equals(existing.getStatus());
+                if (wasLive) {
+                    putInCaches(updated);
+                }
+                gatewayRefresh();
+            })
+            .map(this::toResponse));
     }
 
     // ── Read ──────────────────────────────────────────────────────────────────
@@ -180,16 +185,21 @@ public class ApiRouteServiceImpl implements ApiRouteService {
     // ── Status changes ────────────────────────────────────────────────────────
 
     @Override
-    public Mono<Void> delete(Long id) {
+    public Mono<Void> delete(Long id, String actor) {
         return apiRouteRepository.findByIdWithUri(id)
             .switchIfEmpty(Mono.error(new RouteNotFoundException("Route not found: " + id)))
-            .flatMap(r -> apiRouteRepository.updateStatus(id, "INACT", LocalDateTime.now(), ADMIN))
-            .doOnSuccess(r -> refreshAll())
+            .flatMap(route ->
+                apiRouteRepository.updateStatus(id, "INACT", LocalDateTime.now(), actor)
+                    .doOnNext(r -> {
+                        evictFromCaches(route.getPath(), route.getMethod());
+                        gatewayRefresh();
+                    })
+            )
             .then();
     }
 
     @Override
-    public Mono<Void> enable(Long id) {
+    public Mono<Void> enable(Long id, String actor) {
         return apiRouteRepository.findByIdWithUri(id)
             .switchIfEmpty(Mono.error(new RouteNotFoundException("Route not found: " + id)))
             .flatMap(route -> {
@@ -197,27 +207,38 @@ public class ApiRouteServiceImpl implements ApiRouteService {
                     return Mono.error(new RouteCreationException(
                         "Only INACT routes can be enabled (current: " + route.getStatus() + ")"));
                 }
-                return apiRouteRepository.updateStatus(id, Constants.STATUS_ACTIVE, LocalDateTime.now(), ADMIN);
+                return apiRouteRepository.updateStatus(id, Constants.STATUS_ACTIVE, LocalDateTime.now(), actor)
+                    .filter(rows -> rows > 0)
+                    .switchIfEmpty(Mono.error(new RouteNotFoundException("Route not found: " + id)))
+                    .flatMap(r -> apiRouteRepository.findByIdWithUri(id))
+                    .doOnNext(updated -> {
+                        putInCaches(updated);
+                        gatewayRefresh();
+                    });
             })
-            .filter(rows -> rows > 0)
-            .switchIfEmpty(Mono.error(new RouteNotFoundException("Route not found: " + id)))
-            .doOnSuccess(r -> refreshAll())
             .then();
     }
 
     @Override
-    public Mono<Void> disable(Long id) {
-        return apiRouteRepository.updateStatus(id, "INACT", LocalDateTime.now(), ADMIN)
-            .filter(rows -> rows > 0)
+    public Mono<Void> disable(Long id, String actor) {
+        return apiRouteRepository.findByIdWithUri(id)
             .switchIfEmpty(Mono.error(new RouteNotFoundException("Route not found: " + id)))
-            .doOnSuccess(r -> refreshAll())
+            .flatMap(route ->
+                apiRouteRepository.updateStatus(id, "INACT", LocalDateTime.now(), actor)
+                    .filter(rows -> rows > 0)
+                    .switchIfEmpty(Mono.error(new RouteNotFoundException("Route not found: " + id)))
+                    .doOnNext(r -> {
+                        evictFromCaches(route.getPath(), route.getMethod());
+                        gatewayRefresh();
+                    })
+            )
             .then();
     }
 
     // ── Approval workflow ─────────────────────────────────────────────────────
 
     @Override
-    public Mono<Void> submit(Long id) {
+    public Mono<Void> submit(Long id, String actor) {
         return apiRouteRepository.findByIdWithUri(id)
             .switchIfEmpty(Mono.error(new RouteNotFoundException("Route not found: " + id)))
             .flatMap(route -> {
@@ -225,7 +246,7 @@ public class ApiRouteServiceImpl implements ApiRouteService {
                     return Mono.error(new RouteCreationException(
                         "Only DRAFT routes can be submitted (current: " + route.getStatus() + ")"));
                 }
-                return apiRouteRepository.submitRoute(id, LocalDateTime.now(), ADMIN);
+                return apiRouteRepository.submitRoute(id, LocalDateTime.now(), actor);
             })
             .filter(rows -> rows > 0)
             .switchIfEmpty(Mono.error(new RouteNotFoundException("Route not found: " + id)))
@@ -233,7 +254,7 @@ public class ApiRouteServiceImpl implements ApiRouteService {
     }
 
     @Override
-    public Mono<Void> approve(Long id) {
+    public Mono<Void> approve(Long id, String actor) {
         return apiRouteRepository.findByIdWithUri(id)
             .switchIfEmpty(Mono.error(new RouteNotFoundException("Route not found: " + id)))
             .flatMap(route -> {
@@ -241,16 +262,20 @@ public class ApiRouteServiceImpl implements ApiRouteService {
                     return Mono.error(new RouteCreationException(
                         "Only PENDING routes can be approved (current: " + route.getStatus() + ")"));
                 }
-                return apiRouteRepository.updateStatus(id, Constants.STATUS_ACTIVE, LocalDateTime.now(), ADMIN);
+                return apiRouteRepository.updateStatus(id, Constants.STATUS_ACTIVE, LocalDateTime.now(), actor)
+                    .filter(rows -> rows > 0)
+                    .switchIfEmpty(Mono.error(new RouteNotFoundException("Route not found: " + id)))
+                    .flatMap(r -> apiRouteRepository.findByIdWithUri(id))
+                    .doOnNext(updated -> {
+                        putInCaches(updated);
+                        gatewayRefresh();
+                    });
             })
-            .filter(rows -> rows > 0)
-            .switchIfEmpty(Mono.error(new RouteNotFoundException("Route not found: " + id)))
-            .doOnSuccess(r -> refreshAll())
             .then();
     }
 
     @Override
-    public Mono<Void> reject(Long id, String reason) {
+    public Mono<Void> reject(Long id, String reason, String actor) {
         if (reason == null || reason.isBlank()) {
             return Mono.error(new RouteCreationException("Rejection reason is required"));
         }
@@ -261,7 +286,7 @@ public class ApiRouteServiceImpl implements ApiRouteService {
                     return Mono.error(new RouteCreationException(
                         "Only PENDING routes can be rejected (current: " + route.getStatus() + ")"));
                 }
-                return apiRouteRepository.rejectRoute(id, reason, LocalDateTime.now(), ADMIN);
+                return apiRouteRepository.rejectRoute(id, reason, LocalDateTime.now(), actor);
             })
             .filter(rows -> rows > 0)
             .switchIfEmpty(Mono.error(new RouteNotFoundException("Route not found: " + id)))
@@ -271,7 +296,7 @@ public class ApiRouteServiceImpl implements ApiRouteService {
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     @Override
-    public Mono<Void> deprecate(Long id, LocalDateTime sunsetDate) {
+    public Mono<Void> deprecate(Long id, LocalDateTime sunsetDate, String actor) {
         if (sunsetDate == null) {
             return Mono.error(new RouteCreationException("sunset_date is required when deprecating a route"));
         }
@@ -286,16 +311,20 @@ public class ApiRouteServiceImpl implements ApiRouteService {
                         "Only ACT routes can be deprecated (current status: " + route.getStatus() + ")"));
                 }
                 return apiRouteRepository.updateDeprecation(
-                    id, Constants.STATUS_DEPRECATED, "Y", sunsetDate, LocalDateTime.now(), ADMIN);
+                        id, Constants.STATUS_DEPRECATED, "Y", sunsetDate, LocalDateTime.now(), actor)
+                    .filter(rows -> rows > 0)
+                    .switchIfEmpty(Mono.error(new RouteNotFoundException("Route not found: " + id)))
+                    .flatMap(r -> apiRouteRepository.findByIdWithUri(id))
+                    .doOnNext(updated -> {
+                        putInCaches(updated);
+                        gatewayRefresh();
+                    });
             })
-            .filter(rows -> rows > 0)
-            .switchIfEmpty(Mono.error(new RouteNotFoundException("Route not found: " + id)))
-            .doOnSuccess(r -> refreshAll())
             .then();
     }
 
     @Override
-    public Mono<Void> undeprecate(Long id) {
+    public Mono<Void> undeprecate(Long id, String actor) {
         return apiRouteRepository.findByIdWithUri(id)
             .switchIfEmpty(Mono.error(new RouteNotFoundException("Route not found: " + id)))
             .flatMap(route -> {
@@ -304,49 +333,66 @@ public class ApiRouteServiceImpl implements ApiRouteService {
                         "Only DEPRECATED routes can be un-deprecated (current status: " + route.getStatus() + ")"));
                 }
                 return apiRouteRepository.updateDeprecation(
-                    id, Constants.STATUS_ACTIVE, "N", null, LocalDateTime.now(), ADMIN);
+                        id, Constants.STATUS_ACTIVE, "N", null, LocalDateTime.now(), actor)
+                    .filter(rows -> rows > 0)
+                    .switchIfEmpty(Mono.error(new RouteNotFoundException("Route not found: " + id)))
+                    .flatMap(r -> apiRouteRepository.findByIdWithUri(id))
+                    .doOnNext(updated -> {
+                        putInCaches(updated);
+                        gatewayRefresh();
+                    });
             })
-            .filter(rows -> rows > 0)
-            .switchIfEmpty(Mono.error(new RouteNotFoundException("Route not found: " + id)))
-            .doOnSuccess(r -> refreshAll())
             .then();
     }
 
     @Override
-    public Mono<Void> retire(Long id) {
+    public Mono<Void> retire(Long id, String actor) {
         return apiRouteRepository.findByIdWithUri(id)
             .switchIfEmpty(Mono.error(new RouteNotFoundException("Route not found: " + id)))
             .flatMap(route -> {
                 if (Constants.STATUS_RETIRED.equals(route.getStatus())) {
                     return Mono.error(new RouteCreationException("Route is already retired"));
                 }
-                return apiRouteRepository.updateStatus(id, Constants.STATUS_RETIRED, LocalDateTime.now(), ADMIN);
+                return apiRouteRepository.updateStatus(id, Constants.STATUS_RETIRED, LocalDateTime.now(), actor)
+                    .filter(rows -> rows > 0)
+                    .switchIfEmpty(Mono.error(new RouteNotFoundException("Route not found: " + id)))
+                    .doOnNext(r -> {
+                        evictFromCaches(route.getPath(), route.getMethod());
+                        gatewayRefresh();
+                    });
             })
-            .filter(rows -> rows > 0)
-            .switchIfEmpty(Mono.error(new RouteNotFoundException("Route not found: " + id)))
-            .doOnSuccess(r -> refreshAll())
             .then();
     }
 
-    // ── Reload ────────────────────────────────────────────────────────────────
+    // ── Explicit full reload ───────────────────────────────────────────────────
 
     @Override
     public Mono<Void> reloadRoutes() {
-        return Mono.fromRunnable(this::refreshAll);
+        gatewayRefresh();
+        return apiMigrateRegistry.loadComponent();
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // ── Cache helpers ─────────────────────────────────────────────────────────
 
-    private void refreshAll() {
-        Mono.fromRunnable(() -> {
-            try {
-                gatewayRouteService.refreshRoutes();
-                apiMigrateRegistry.loadComponent();
-            } catch (Exception e) {
-                log.error("Route refresh failed: {}", e.getMessage());
-            }
-        }).subscribeOn(Schedulers.boundedElastic()).subscribe();
+    private void putInCaches(ApiRoute route) {
+        ApiRouteDto dto = new ApiRouteDto();
+        dto.setData(route);
+        ApiRouteManagerCache.put(dto);
+        apiRouteManagerRedisCache.put(dto);
     }
+
+    private void evictFromCaches(String path, String method) {
+        ApiRouteManagerCache.evict(path, method);
+        apiRouteManagerRedisCache.evict(path, method);
+    }
+
+    private void gatewayRefresh() {
+        Mono.fromRunnable(gatewayRouteService::refreshRoutes)
+            .subscribeOn(Schedulers.boundedElastic())
+            .subscribe(null, e -> log.error("Gateway refresh failed: {}", e.getMessage()));
+    }
+
+    // ── Mapping ───────────────────────────────────────────────────────────────
 
     private RouteApiResponse toResponse(ApiRoute r) {
         return new RouteApiResponse(

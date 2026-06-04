@@ -52,7 +52,7 @@ public class AdminRouteController {
     @PostMapping
     public Mono<ResponseEntity<RouteApiResponse>> create(@RequestBody RouteApiRequest request, ServerWebExchange exchange) {
         return adminAuth.require(exchange, Permissions.ROUTE_WRITE)
-            .then(apiRouteService.create(request)
+            .then(apiRouteService.create(request, actor(exchange))
                 .map(r -> ResponseEntity.status(HttpStatus.CREATED).body(r)));
     }
 
@@ -60,7 +60,7 @@ public class AdminRouteController {
     public Mono<ResponseEntity<RouteApiResponse>> update(
             @PathVariable Long id, @RequestBody RouteApiRequest request, ServerWebExchange exchange) {
         return adminAuth.require(exchange, Permissions.ROUTE_WRITE)
-            .then(apiRouteService.update(id, request)
+            .then(apiRouteService.update(id, request, actor(exchange))
                 .map(ResponseEntity::ok)
                 .defaultIfEmpty(ResponseEntity.<RouteApiResponse>notFound().build()));
     }
@@ -68,28 +68,28 @@ public class AdminRouteController {
     @PutMapping("/{id}/enable")
     public Mono<ResponseEntity<Map<String, Object>>> enable(@PathVariable Long id, ServerWebExchange exchange) {
         return adminAuth.require(exchange, Permissions.ROUTE_WRITE)
-            .then(apiRouteService.enable(id)
+            .then(apiRouteService.enable(id, actor(exchange))
                 .thenReturn(ResponseEntity.ok(Map.<String, Object>of("id", id, "status", "ACT", "message", "Route enabled"))));
     }
 
     @PutMapping("/{id}/disable")
     public Mono<ResponseEntity<Map<String, Object>>> disable(@PathVariable Long id, ServerWebExchange exchange) {
         return adminAuth.require(exchange, Permissions.ROUTE_WRITE)
-            .then(apiRouteService.disable(id)
+            .then(apiRouteService.disable(id, actor(exchange))
                 .thenReturn(ResponseEntity.ok(Map.<String, Object>of("id", id, "status", "INACT", "message", "Route disabled"))));
     }
 
     @DeleteMapping("/{id}")
     public Mono<ResponseEntity<Map<String, Object>>> delete(@PathVariable Long id, ServerWebExchange exchange) {
         return adminAuth.require(exchange, Permissions.ROUTE_WRITE)
-            .then(apiRouteService.delete(id)
+            .then(apiRouteService.delete(id, actor(exchange))
                 .thenReturn(ResponseEntity.ok(Map.<String, Object>of("id", id, "message", "Route deleted"))));
     }
 
     @PostMapping("/{id}/submit")
     public Mono<ResponseEntity<Map<String, Object>>> submit(@PathVariable Long id, ServerWebExchange exchange) {
         return adminAuth.require(exchange, Permissions.ROUTE_WRITE)
-            .then(apiRouteService.submit(id)
+            .then(apiRouteService.submit(id, actor(exchange))
                 .thenReturn(ResponseEntity.ok(Map.<String, Object>of(
                     "id", id, "status", Constants.STATUS_PENDING,
                     "message", "Route submitted for approval"))));
@@ -98,7 +98,7 @@ public class AdminRouteController {
     @PostMapping("/{id}/approve")
     public Mono<ResponseEntity<Map<String, Object>>> approve(@PathVariable Long id, ServerWebExchange exchange) {
         return adminAuth.require(exchange, Permissions.ROUTE_APPROVE)
-            .then(apiRouteService.approve(id)
+            .then(apiRouteService.approve(id, actor(exchange))
                 .thenReturn(ResponseEntity.ok(Map.<String, Object>of(
                     "id", id, "status", Constants.STATUS_ACTIVE,
                     "message", "Route approved and live"))));
@@ -108,7 +108,7 @@ public class AdminRouteController {
     public Mono<ResponseEntity<Map<String, Object>>> reject(
             @PathVariable Long id, @RequestBody RejectRouteRequest request, ServerWebExchange exchange) {
         return adminAuth.require(exchange, Permissions.ROUTE_APPROVE)
-            .then(apiRouteService.reject(id, request.reason())
+            .then(apiRouteService.reject(id, request.reason(), actor(exchange))
                 .thenReturn(ResponseEntity.ok(Map.<String, Object>of(
                     "id", id, "status", Constants.STATUS_DRAFT,
                     "message", "Route rejected"))));
@@ -118,7 +118,7 @@ public class AdminRouteController {
     public Mono<ResponseEntity<Map<String, Object>>> deprecate(
             @PathVariable Long id, @RequestBody DeprecateRouteRequest request, ServerWebExchange exchange) {
         return adminAuth.require(exchange, Permissions.ROUTE_WRITE)
-            .then(apiRouteService.deprecate(id, request.sunsetDate())
+            .then(apiRouteService.deprecate(id, request.sunsetDate(), actor(exchange))
                 .thenReturn(ResponseEntity.ok(Map.<String, Object>of(
                     "id", id,
                     "status", Constants.STATUS_DEPRECATED,
@@ -129,7 +129,7 @@ public class AdminRouteController {
     @PutMapping("/{id}/undeprecate")
     public Mono<ResponseEntity<Map<String, Object>>> undeprecate(@PathVariable Long id, ServerWebExchange exchange) {
         return adminAuth.require(exchange, Permissions.ROUTE_WRITE)
-            .then(apiRouteService.undeprecate(id)
+            .then(apiRouteService.undeprecate(id, actor(exchange))
                 .thenReturn(ResponseEntity.ok(Map.<String, Object>of(
                     "id", id,
                     "status", Constants.STATUS_ACTIVE,
@@ -139,11 +139,16 @@ public class AdminRouteController {
     @PutMapping("/{id}/retire")
     public Mono<ResponseEntity<Map<String, Object>>> retire(@PathVariable Long id, ServerWebExchange exchange) {
         return adminAuth.require(exchange, Permissions.ROUTE_WRITE)
-            .then(apiRouteService.retire(id)
+            .then(apiRouteService.retire(id, actor(exchange))
                 .thenReturn(ResponseEntity.ok(Map.<String, Object>of(
                     "id", id,
                     "status", Constants.STATUS_RETIRED,
                     "message", "Route retired and removed from gateway"))));
+    }
+
+    private String actor(ServerWebExchange exchange) {
+        String actor = exchange.getAttribute("adminUser");
+        return actor != null ? actor : "system";
     }
 
     @PostMapping("/reload")

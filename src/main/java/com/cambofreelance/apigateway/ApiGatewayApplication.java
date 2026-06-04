@@ -25,7 +25,6 @@ public class ApiGatewayApplication {
         log.info("Initializing api route Manager ...");
         startup.initApiMigrate();
         log.info("Finished api route Manager ...");
-        log.error("DEPLOYMENT ONE");
     }
 
 }
