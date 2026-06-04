@@ -57,7 +57,7 @@ async function doRefresh() {
   if (!refreshToken) { auth.clear(); return null; }
 
   try {
-    const res = await fetch('/admin/auth/refresh', {
+    const res = await fetch('/api/management/admin/auth/refresh', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refresh_token: refreshToken }),
