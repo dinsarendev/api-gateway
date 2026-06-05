@@ -2,6 +2,7 @@ package com.cambofreelance.apigateway.controllers;
 
 import com.cambofreelance.apigateway.configs.AdminAuthHelper;
 import com.cambofreelance.apigateway.constants.Permissions;
+import com.cambofreelance.apigateway.models.AlertHistory;
 import com.cambofreelance.apigateway.models.Incident;
 import com.cambofreelance.apigateway.service.impl.IncidentService;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -38,6 +39,8 @@ public class AdminIncidentController {
         String title,
         String description
     ) {}
+
+    record AcknowledgeRequest(String note) {}
 
     // ── Dashboard ──────────────────────────────────────────────────────────────
 
@@ -97,6 +100,19 @@ public class AdminIncidentController {
             .map(ResponseEntity::ok);
     }
 
+    // ── Acknowledge ────────────────────────────────────────────────────────────
+
+    @PostMapping("/{id}/acknowledge")
+    public Mono<ResponseEntity<Incident>> acknowledge(
+            @PathVariable Long id,
+            @RequestBody(required = false) AcknowledgeRequest req,
+            ServerWebExchange exchange) {
+        String note = req != null ? req.note() : null;
+        return adminAuth.require(exchange, Permissions.INCIDENT_WRITE)
+            .then(incidentService.acknowledge(id, adminAuth.currentUser(exchange), note))
+            .map(ResponseEntity::ok);
+    }
+
     // ── Resolve ────────────────────────────────────────────────────────────────
 
     @PostMapping("/{id}/resolve")
@@ -104,6 +120,15 @@ public class AdminIncidentController {
         return adminAuth.require(exchange, Permissions.INCIDENT_WRITE)
             .then(incidentService.resolve(id, adminAuth.currentUser(exchange)))
             .map(ResponseEntity::ok);
+    }
+
+    // ── Alert History ──────────────────────────────────────────────────────────
+
+    @GetMapping("/{id}/history")
+    public Mono<ResponseEntity<List<AlertHistory>>> history(
+            @PathVariable Long id, ServerWebExchange exchange) {
+        return adminAuth.require(exchange, Permissions.INCIDENT_READ)
+            .then(incidentService.getHistory(id).collectList().map(ResponseEntity::ok));
     }
 
     // ── Close ──────────────────────────────────────────────────────────────────

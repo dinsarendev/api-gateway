@@ -37,6 +37,10 @@ public final class Permissions {
     public static final String INCIDENT_READ  = "INCIDENT_READ";
     public static final String INCIDENT_WRITE = "INCIDENT_WRITE";
 
+    // ── Notifications ─────────────────────────────────────────────────────────
+    public static final String NOTIFICATION_READ  = "NOTIFICATION_READ";
+    public static final String NOTIFICATION_WRITE = "NOTIFICATION_WRITE";
+
     // ── Audit Logs ────────────────────────────────────────────────────────────
     public static final String AUDIT_LOG_READ = "AUDIT_LOG_READ";
 }

@@ -93,18 +93,28 @@ export const API = {
   deleteOAuth2Provider: (id)       => del(`/admin/oauth2-providers/${id}`),
 
   // ── Incidents ─────────────────────────────────────────────────────────────
-  getIncidentDashboard: ()           => get('/admin/incidents/dashboard'),
+  getIncidentDashboard: ()               => get('/admin/incidents/dashboard'),
   getIncidents:         (status = 'ALL') => get(`/admin/incidents?status=${status}`),
-  getIncident:          (id)         => get(`/admin/incidents/${id}`),
-  createIncident:       (data)       => post('/admin/incidents', data),
-  updateIncident:       (id, data)   => put(`/admin/incidents/${id}`, data),
-  resolveIncident:      (id)         => post(`/admin/incidents/${id}/resolve`),
-  closeIncident:        (id)         => del(`/admin/incidents/${id}`),
+  getIncident:          (id)             => get(`/admin/incidents/${id}`),
+  createIncident:       (data)           => post('/admin/incidents', data),
+  updateIncident:       (id, data)       => put(`/admin/incidents/${id}`, data),
+  acknowledgeIncident:  (id, note)       => post(`/admin/incidents/${id}/acknowledge`, { note }),
+  resolveIncident:      (id)             => post(`/admin/incidents/${id}/resolve`),
+  closeIncident:        (id)             => del(`/admin/incidents/${id}`),
+  getIncidentHistory:   (id)             => get(`/admin/incidents/${id}/history`),
+
+  // ── Notification channels ─────────────────────────────────────────────────
+  getNotificationChannels:    ()         => get('/admin/notifications/channels'),
+  createNotificationChannel:  (data)     => post('/admin/notifications/channels', data),
+  updateNotificationChannel:  (id, data) => put(`/admin/notifications/channels/${id}`, data),
+  deleteNotificationChannel:  (id)       => del(`/admin/notifications/channels/${id}`),
+  testNotificationChannel:    (id)       => post(`/admin/notifications/channels/${id}/test`),
 
   // ── Monitoring ────────────────────────────────────────────────────────────
-  getGatewayMetrics:  (window = 60) => get(`/admin/metrics/gateway?window=${window}`),
+  getGatewayMetrics:  (window = 60)          => get(`/admin/metrics/gateway?window=${window}`),
   getApiMetrics:      (window = 1, limit = 10) => get(`/admin/metrics/apis?window=${window}&limit=${limit}`),
   getConsumerMetrics: (window = 1, limit = 10) => get(`/admin/metrics/consumers?window=${window}&limit=${limit}`),
+  getSystemMetrics:   ()                     => get('/admin/metrics/system'),
 
   // ── Audit Logs ────────────────────────────────────────────────────────────
   getAuditLogs: (params = {}) => {

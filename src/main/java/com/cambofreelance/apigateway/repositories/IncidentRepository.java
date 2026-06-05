@@ -21,6 +21,20 @@ public interface IncidentRepository extends R2dbcRepository<Incident, Long> {
 
     Mono<Long> countBySeverityAndStatusNot(String severity, String status);
 
+    // ── Acknowledge ───────────────────────────────────────────────────────────
+
+    @Modifying
+    @Query("""
+        UPDATE public.incident
+           SET status = 'INVESTIGATING',
+               acknowledged_at = :acknowledgedAt,
+               acknowledged_by = :acknowledgedBy,
+               updated_at = :acknowledgedAt,
+               updated_by = :acknowledgedBy
+         WHERE id = :id AND status = 'OPEN'
+        """)
+    Mono<Integer> acknowledge(Long id, LocalDateTime acknowledgedAt, String acknowledgedBy);
+
     // ── Auto-incident deduplication ────────────────────────────────────────────
 
     @Query("SELECT * FROM public.incident WHERE trigger_key = :triggerKey AND status IN ('OPEN','INVESTIGATING') LIMIT 1")

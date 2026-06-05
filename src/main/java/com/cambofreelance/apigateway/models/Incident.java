@@ -66,6 +66,12 @@ public class Incident {
     @Column("opened_at")
     private LocalDateTime openedAt;
 
+    @Column("acknowledged_at")
+    private LocalDateTime acknowledgedAt;
+
+    @Column("acknowledged_by")
+    private String acknowledgedBy;
+
     @Column("resolved_at")
     private LocalDateTime resolvedAt;
 

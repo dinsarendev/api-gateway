@@ -31,6 +31,15 @@ const TYPE_ICON = {
   INFRASTRUCTURE: 'fa-microchip',
 };
 
+const HISTORY_ICON = {
+  OPENED:       { icon: 'fa-circle-plus',  color: '#ef4444' },
+  ACKNOWLEDGED: { icon: 'fa-eye',          color: '#f97316' },
+  RESOLVED:     { icon: 'fa-circle-check', color: '#22c55e' },
+  CLOSED:       { icon: 'fa-lock',         color: '#64748b' },
+  UPDATED:      { icon: 'fa-pen',          color: '#6366f1' },
+  NOTE:         { icon: 'fa-comment',      color: '#3b82f6' },
+};
+
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
 function SeverityBadge({ severity }) {
@@ -79,20 +88,20 @@ function StatCard({ label, value, sub, color, icon }) {
 const EMPTY_FORM = { title: '', description: '', severity: 'HIGH', type: 'ERROR', affected_service: '', affected_route: '' };
 
 export default function Incidents() {
-  const toast   = useToast();
-  const { can } = useAuth();
+  const toast    = useToast();
+  const { can }  = useAuth();
   const canWrite = can(PERMS.INCIDENT_WRITE);
 
-  const [dash,     setDash]     = useState(null);
+  const [dash,      setDash]      = useState(null);
   const [incidents, setIncidents] = useState([]);
-  const [loading,  setLoading]  = useState(true);
-  const [filter,   setFilter]   = useState('ALL');
-  const [search,   setSearch]   = useState('');
+  const [loading,   setLoading]   = useState(true);
+  const [filter,    setFilter]    = useState('ALL');
+  const [search,    setSearch]    = useState('');
 
   // Create modal
-  const [modal,   setModal]   = useState(false);
-  const [form,    setForm]    = useState(EMPTY_FORM);
-  const [saving,  setSaving]  = useState(false);
+  const [modal,  setModal]  = useState(false);
+  const [form,   setForm]   = useState(EMPTY_FORM);
+  const [saving, setSaving] = useState(false);
 
   // Detail / edit modal
   const [detail,       setDetail]       = useState(null);
@@ -100,6 +109,16 @@ export default function Incidents() {
   const [editStatus,   setEditStatus]   = useState('');
   const [editSeverity, setEditSeverity] = useState('');
   const [updating,     setUpdating]     = useState(false);
+  const [detailTab,    setDetailTab]    = useState('details'); // 'details' | 'history'
+
+  // Alert history
+  const [history,        setHistory]        = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  // Acknowledge
+  const [ackNote,      setAckNote]      = useState('');
+  const [ackExpanded,  setAckExpanded]  = useState(false);
+  const [acknowledging, setAcknowledging] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -115,6 +134,15 @@ export default function Incidents() {
   }, [filter]);
 
   useEffect(() => { load(); }, [load]);
+
+  const loadHistory = async (id) => {
+    setHistoryLoading(true);
+    try {
+      const h = await API.getIncidentHistory(id);
+      setHistory(h);
+    } catch { toast.error('Failed to load history'); }
+    finally { setHistoryLoading(false); }
+  };
 
   // ── Filtered list ──────────────────────────────────────────────────────────
 
@@ -146,7 +174,24 @@ export default function Incidents() {
     setDetail(i);
     setEditStatus(i.status);
     setEditSeverity(i.severity);
+    setDetailTab('details');
+    setAckExpanded(false);
+    setAckNote('');
     setDetailModal(true);
+    loadHistory(i.id);
+  };
+
+  const acknowledge = async (id, note) => {
+    setAcknowledging(true);
+    try {
+      await API.acknowledgeIncident(id, note || null);
+      toast.success('Incident acknowledged');
+      setAckExpanded(false);
+      setAckNote('');
+      setDetailModal(false);
+      load();
+    } catch (e) { toast.error(e?.message || 'Failed to acknowledge'); }
+    finally { setAcknowledging(false); }
   };
 
   const resolve = async (id) => {
@@ -185,7 +230,9 @@ export default function Incidents() {
     } catch { toast.error('Failed to close'); }
   };
 
-  const fmt = dt => dt ? new Date(dt).toLocaleString() : '—';
+  const fmt     = dt  => dt ? new Date(dt).toLocaleString() : '—';
+  const fmtTime = dt  => dt ? new Date(dt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+  const fmtDate = dt  => dt ? new Date(dt).toLocaleDateString([], { month: 'short', day: 'numeric' }) : '';
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -194,18 +241,17 @@ export default function Incidents() {
 
       {/* ── Dashboard stats ──────────────────────────────────────────────────── */}
       <div className="stats-grid" style={{ marginBottom: '1.25rem' }}>
-        <StatCard label="Open Incidents"    value={dash?.open_incidents ?? '—'}
+        <StatCard label="Open Incidents"   value={dash?.open_incidents ?? '—'}
           color="#ef4444" icon="fa-circle-exclamation"
           sub={dash?.investigating ? `${dash.investigating} investigating` : undefined} />
-        <StatCard label="Critical"          value={dash?.critical_incidents ?? '—'}
-          color="#dc2626" icon="fa-bolt"
-          sub="unresolved" />
-        <StatCard label="Resolved (24 h)"   value={dash?.resolved_last_24h ?? '—'}
+        <StatCard label="Critical"         value={dash?.critical_incidents ?? '—'}
+          color="#dc2626" icon="fa-bolt" sub="unresolved" />
+        <StatCard label="Resolved (24 h)"  value={dash?.resolved_last_24h ?? '—'}
           color="#22c55e" icon="fa-circle-check" />
-        <StatCard label="MTTR"              value={dash?.mttr_human ?? '—'}
+        <StatCard label="MTTR"             value={dash?.mttr_human ?? '—'}
           color="#6366f1" icon="fa-clock"
           sub="mean time to resolve (30 d)" />
-        <StatCard label="MTBF"              value={dash?.mtbf_human ?? '—'}
+        <StatCard label="MTBF"             value={dash?.mtbf_human ?? '—'}
           color="#3b82f6" icon="fa-calendar-xmark"
           sub="mean time between failures (30 d)" />
       </div>
@@ -258,7 +304,7 @@ export default function Incidents() {
                     <th>Source</th>
                     <th>Opened</th>
                     <th>Resolved</th>
-                    {canWrite && <th style={{ width: 80 }}>Actions</th>}
+                    {canWrite && <th style={{ width: 100 }}>Actions</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -301,6 +347,16 @@ export default function Incidents() {
                         {canWrite && (
                           <td onClick={e => e.stopPropagation()}>
                             <div className="actions-row">
+                              {i.status === 'OPEN' && (
+                                <button
+                                  className="btn-action"
+                                  title="Acknowledge"
+                                  onClick={() => acknowledge(i.id, null)}
+                                  style={{ color: '#f97316' }}
+                                >
+                                  <i className="fa-solid fa-eye" />
+                                </button>
+                              )}
                               {i.status !== 'RESOLVED' && i.status !== 'CLOSED' && (
                                 <button
                                   className="btn-action"
@@ -401,6 +457,15 @@ export default function Incidents() {
               <button className="btn btn-secondary" onClick={() => setDetailModal(false)}>Close</button>
               {canWrite && detail.status !== 'RESOLVED' && detail.status !== 'CLOSED' && (
                 <>
+                  {detail.status === 'OPEN' && !ackExpanded && (
+                    <button
+                      className="btn btn-secondary"
+                      onClick={() => setAckExpanded(true)}
+                      style={{ borderColor: '#f97316', color: '#f97316' }}
+                    >
+                      <i className="fa-solid fa-eye" style={{ marginRight: '.35rem' }} />Acknowledge
+                    </button>
+                  )}
                   <button className="btn btn-secondary" onClick={updateIncident} disabled={updating}>
                     {updating ? 'Saving…' : 'Save Changes'}
                   </button>
@@ -413,68 +478,208 @@ export default function Incidents() {
             </>
           }
         >
-          {/* Status banner */}
-          <div style={{
-            display: 'flex', gap: '.75rem', flexWrap: 'wrap',
-            background: 'var(--bg-surface-alt)', border: '1px solid var(--border)',
-            borderRadius: '.5rem', padding: '.85rem 1rem', marginBottom: '1rem',
-          }}>
-            <div><span style={{ fontSize: '.7rem', color: 'var(--muted)', display: 'block' }}>SEVERITY</span>
-              <SeverityBadge severity={detail.severity} /></div>
-            <div><span style={{ fontSize: '.7rem', color: 'var(--muted)', display: 'block' }}>STATUS</span>
-              <StatusBadge status={detail.status} /></div>
-            <div><span style={{ fontSize: '.7rem', color: 'var(--muted)', display: 'block' }}>TYPE</span>
-              <span style={{ fontSize: '.8rem', fontWeight: 600 }}>{detail.type}</span></div>
-            <div><span style={{ fontSize: '.7rem', color: 'var(--muted)', display: 'block' }}>SOURCE</span>
-              <span style={{ fontSize: '.8rem', fontWeight: 600 }}>{detail.source}</span></div>
-            {detail.affectedService && (
-              <div><span style={{ fontSize: '.7rem', color: 'var(--muted)', display: 'block' }}>SERVICE</span>
-                <span style={{ fontSize: '.8rem', fontWeight: 600 }}>{detail.affectedService}</span></div>
-            )}
+          {/* Tabs */}
+          <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border)', marginBottom: '1rem' }}>
+            {['details', 'history'].map(tab => (
+              <button
+                key={tab}
+                onClick={() => setDetailTab(tab)}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  padding: '.5rem 1rem', fontSize: '.82rem', fontWeight: 600,
+                  color: detailTab === tab ? 'var(--primary)' : 'var(--muted)',
+                  borderBottom: detailTab === tab ? '2px solid var(--primary)' : '2px solid transparent',
+                  marginBottom: -1,
+                }}
+              >
+                {tab === 'details' ? 'Details' : (
+                  <><i className="fa-solid fa-clock-rotate-left" style={{ marginRight: '.35rem' }} />
+                  Alert History {history.length > 0 && `(${history.length})`}</>
+                )}
+              </button>
+            ))}
           </div>
 
-          {detail.description && (
-            <div style={{ fontSize: '.875rem', color: 'var(--text-secondary)', marginBottom: '1rem',
-              padding: '.75rem', background: 'var(--bg-surface-alt)', borderRadius: '.4rem' }}>
-              {detail.description}
-            </div>
+          {/* ── Details tab ──────────────────────────────────────────────────── */}
+          {detailTab === 'details' && (
+            <>
+              {/* Status banner */}
+              <div style={{
+                display: 'flex', gap: '.75rem', flexWrap: 'wrap',
+                background: 'var(--bg-surface-alt)', border: '1px solid var(--border)',
+                borderRadius: '.5rem', padding: '.85rem 1rem', marginBottom: '1rem',
+              }}>
+                <div><span style={{ fontSize: '.7rem', color: 'var(--muted)', display: 'block' }}>SEVERITY</span>
+                  <SeverityBadge severity={detail.severity} /></div>
+                <div><span style={{ fontSize: '.7rem', color: 'var(--muted)', display: 'block' }}>STATUS</span>
+                  <StatusBadge status={detail.status} /></div>
+                <div><span style={{ fontSize: '.7rem', color: 'var(--muted)', display: 'block' }}>TYPE</span>
+                  <span style={{ fontSize: '.8rem', fontWeight: 600 }}>{detail.type}</span></div>
+                <div><span style={{ fontSize: '.7rem', color: 'var(--muted)', display: 'block' }}>SOURCE</span>
+                  <span style={{ fontSize: '.8rem', fontWeight: 600 }}>{detail.source}</span></div>
+                {detail.affectedService && (
+                  <div><span style={{ fontSize: '.7rem', color: 'var(--muted)', display: 'block' }}>SERVICE</span>
+                    <span style={{ fontSize: '.8rem', fontWeight: 600 }}>{detail.affectedService}</span></div>
+                )}
+              </div>
+
+              {detail.description && (
+                <div style={{ fontSize: '.875rem', color: 'var(--text-secondary)', marginBottom: '1rem',
+                  padding: '.75rem', background: 'var(--bg-surface-alt)', borderRadius: '.4rem' }}>
+                  {detail.description}
+                </div>
+              )}
+
+              {(detail.triggerValue || detail.triggerThreshold) && (
+                <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '1rem', fontSize: '.82rem' }}>
+                  {detail.triggerValue && (
+                    <div><span style={{ color: 'var(--muted)' }}>Measured: </span>
+                      <strong style={{ color: '#ef4444' }}>{detail.triggerValue}</strong></div>
+                  )}
+                  {detail.triggerThreshold && (
+                    <div><span style={{ color: 'var(--muted)' }}>Threshold: </span>
+                      <strong>{detail.triggerThreshold}</strong></div>
+                  )}
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem',
+                fontSize: '.8rem', color: 'var(--muted)' }}>
+                <div><i className="fa-regular fa-clock" style={{ marginRight: '.35rem' }} />
+                  Opened: <strong style={{ color: 'var(--text-primary)' }}>{fmt(detail.openedAt)}</strong></div>
+                {detail.acknowledgedAt && (
+                  <div><i className="fa-solid fa-eye" style={{ marginRight: '.35rem', color: '#f97316' }} />
+                    Acknowledged: <strong style={{ color: 'var(--text-primary)' }}>{fmt(detail.acknowledgedAt)}</strong>
+                    {detail.acknowledgedBy && <span style={{ color: 'var(--muted)' }}> by {detail.acknowledgedBy}</span>}
+                  </div>
+                )}
+                <div><i className="fa-solid fa-circle-check" style={{ marginRight: '.35rem', color: '#22c55e' }} />
+                  Resolved: <strong style={{ color: 'var(--text-primary)' }}>{fmt(detail.resolvedAt)}</strong></div>
+              </div>
+
+              {/* Acknowledge inline expander */}
+              {canWrite && ackExpanded && detail.status === 'OPEN' && (
+                <div style={{
+                  border: '1px solid #fed7aa', borderRadius: '.5rem',
+                  padding: '1rem', background: '#fff7ed', marginBottom: '1rem',
+                }}>
+                  <div style={{ fontSize: '.8rem', fontWeight: 600, color: '#9a3412', marginBottom: '.5rem' }}>
+                    <i className="fa-solid fa-eye" style={{ marginRight: '.35rem' }} />Acknowledge Incident
+                  </div>
+                  <textarea
+                    className="form-control"
+                    rows={2}
+                    placeholder="Optional note (e.g. investigating upstream timeout)…"
+                    value={ackNote}
+                    onChange={e => setAckNote(e.target.value)}
+                    style={{ marginBottom: '.5rem' }}
+                  />
+                  <div style={{ display: 'flex', gap: '.5rem' }}>
+                    <button
+                      className="btn btn-primary btn-sm"
+                      onClick={() => acknowledge(detail.id, ackNote)}
+                      disabled={acknowledging}
+                      style={{ background: '#ea580c', borderColor: '#ea580c' }}
+                    >
+                      {acknowledging ? 'Acknowledging…' : 'Confirm Acknowledge'}
+                    </button>
+                    <button className="btn btn-secondary btn-sm" onClick={() => { setAckExpanded(false); setAckNote(''); }}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {canWrite && detail.status !== 'RESOLVED' && detail.status !== 'CLOSED' && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Update Status</label>
+                    <select className="form-control" value={editStatus} onChange={e => setEditStatus(e.target.value)}>
+                      {STATUSES.filter(s => s !== 'CLOSED').map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Update Severity</label>
+                    <select className="form-control" value={editSeverity} onChange={e => setEditSeverity(e.target.value)}>
+                      {SEVERITIES.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
-          {(detail.triggerValue || detail.triggerThreshold) && (
-            <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '1rem', fontSize: '.82rem' }}>
-              {detail.triggerValue && (
-                <div><span style={{ color: 'var(--muted)' }}>Measured: </span>
-                  <strong style={{ color: '#ef4444' }}>{detail.triggerValue}</strong></div>
-              )}
-              {detail.triggerThreshold && (
-                <div><span style={{ color: 'var(--muted)' }}>Threshold: </span>
-                  <strong>{detail.triggerThreshold}</strong></div>
-              )}
-            </div>
-          )}
+          {/* ── History tab ──────────────────────────────────────────────────── */}
+          {detailTab === 'history' && (
+            <div>
+              {historyLoading
+                ? <div className="loading-center"><div className="spinner" /></div>
+                : history.length === 0
+                  ? <div className="empty-state" style={{ padding: '2rem 0' }}>
+                      <i className="fa-solid fa-clock-rotate-left" style={{ color: '#94a3b8' }} />
+                      No history recorded yet
+                    </div>
+                  : (
+                    <div style={{ position: 'relative', paddingLeft: '1.75rem' }}>
+                      {/* Vertical line */}
+                      <div style={{
+                        position: 'absolute', left: '.55rem', top: 0, bottom: 0,
+                        width: 2, background: 'var(--border)',
+                      }} />
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem',
-            fontSize: '.8rem', color: 'var(--muted)' }}>
-            <div><i className="fa-regular fa-clock" style={{ marginRight: '.35rem' }} />
-              Opened: <strong style={{ color: 'var(--text-primary)' }}>{fmt(detail.openedAt)}</strong></div>
-            <div><i className="fa-solid fa-circle-check" style={{ marginRight: '.35rem', color: '#22c55e' }} />
-              Resolved: <strong style={{ color: 'var(--text-primary)' }}>{fmt(detail.resolvedAt)}</strong></div>
-          </div>
+                      {history.map((h, idx) => {
+                        const { icon, color } = HISTORY_ICON[h.action] || { icon: 'fa-circle', color: '#94a3b8' };
+                        return (
+                          <div key={h.id ?? idx} style={{
+                            position: 'relative', marginBottom: '1rem', paddingLeft: '.75rem',
+                          }}>
+                            {/* Dot */}
+                            <div style={{
+                              position: 'absolute', left: -22, top: 2,
+                              width: 20, height: 20, borderRadius: '50%',
+                              background: 'var(--bg-surface)', border: `2px solid ${color}`,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            }}>
+                              <i className={`fa-solid ${icon}`} style={{ fontSize: '.6rem', color }} />
+                            </div>
 
-          {canWrite && detail.status !== 'RESOLVED' && detail.status !== 'CLOSED' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-              <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label">Update Status</label>
-                <select className="form-control" value={editStatus} onChange={e => setEditStatus(e.target.value)}>
-                  {STATUSES.filter(s => s !== 'CLOSED').map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-              <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label">Update Severity</label>
-                <select className="form-control" value={editSeverity} onChange={e => setEditSeverity(e.target.value)}>
-                  {SEVERITIES.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
+                            <div style={{
+                              background: 'var(--bg-surface-alt)', border: '1px solid var(--border)',
+                              borderRadius: '.4rem', padding: '.6rem .75rem',
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '.2rem' }}>
+                                <span style={{ fontSize: '.78rem', fontWeight: 700, color }}>
+                                  {h.action}
+                                  {h.oldStatus && h.newStatus && h.oldStatus !== h.newStatus && (
+                                    <span style={{ fontWeight: 400, color: 'var(--muted)', marginLeft: '.4rem' }}>
+                                      {h.oldStatus} → {h.newStatus}
+                                    </span>
+                                  )}
+                                </span>
+                                <span style={{ fontSize: '.7rem', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                                  {fmtDate(h.performedAt)} {fmtTime(h.performedAt)}
+                                </span>
+                              </div>
+                              {h.performedBy && (
+                                <div style={{ fontSize: '.72rem', color: 'var(--muted)' }}>
+                                  <i className="fa-solid fa-user" style={{ marginRight: '.25rem' }} />
+                                  {h.performedBy}
+                                </div>
+                              )}
+                              {h.note && (
+                                <div style={{ fontSize: '.78rem', color: 'var(--text-secondary)', marginTop: '.3rem',
+                                  padding: '.3rem .5rem', background: 'var(--bg-surface)', borderRadius: '.3rem',
+                                  borderLeft: `3px solid ${color}` }}>
+                                  {h.note}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )
+              }
             </div>
           )}
         </Modal>

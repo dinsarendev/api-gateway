@@ -16,6 +16,7 @@ import OAuth2Providers from './pages/OAuth2Providers';
 import Users           from './pages/Users';
 import Roles           from './pages/Roles';
 import Incidents       from './pages/Incidents';
+import Notifications   from './pages/Notifications';
 import Monitoring      from './pages/Monitoring';
 import AuditLogs       from './pages/AuditLogs';
 import Profile         from './pages/Profile';
@@ -30,6 +31,7 @@ const TITLES = {
   '/registry':          'Service Registry',
   '/health':            'Health Monitor',
   '/incidents':         'Incidents',
+  '/notifications':     'Notification Channels',
   '/monitoring':        'Monitoring',
   '/security/api-keys': 'API Key Management',
   '/security/ip-acl':   'IP Access Control',
@@ -107,8 +109,9 @@ function Layout({ sidebarOpen, setSidebarOpen, sidebarCollapsed, setSidebarColla
             <Route path="/groups"            element={<Groups />} />
             <Route path="/registry"          element={<Registry />} />
             <Route path="/health"            element={<Health />} />
-            <Route path="/incidents"          element={<Incidents />} />
-            <Route path="/monitoring"         element={<Monitoring />} />
+            <Route path="/incidents"      element={<Incidents />} />
+            <Route path="/notifications"  element={<Notifications />} />
+            <Route path="/monitoring"     element={<Monitoring />} />
             <Route path="/security/api-keys" element={<ApiKeys />} />
             <Route path="/security/ip-acl"   element={<IpAccessControl />} />
             <Route path="/security/oauth2"   element={<OAuth2Providers />} />

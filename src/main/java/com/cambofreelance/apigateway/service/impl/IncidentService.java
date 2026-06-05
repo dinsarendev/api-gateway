@@ -1,6 +1,8 @@
 package com.cambofreelance.apigateway.service.impl;
 
+import com.cambofreelance.apigateway.models.AlertHistory;
 import com.cambofreelance.apigateway.models.Incident;
+import com.cambofreelance.apigateway.repositories.AlertHistoryRepository;
 import com.cambofreelance.apigateway.repositories.IncidentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +19,8 @@ import java.util.*;
 public class IncidentService {
 
     private final IncidentRepository incidentRepository;
+    private final AlertHistoryRepository alertHistoryRepository;
+    private final AlertNotificationService alertNotificationService;
 
     // ── CRUD ───────────────────────────────────────────────────────────────────
 
@@ -27,7 +31,12 @@ public class IncidentService {
         request.setOpenedAt(LocalDateTime.now());
         request.setCreatedBy(createdBy);
         if (request.getSeverity() == null) request.setSeverity(Incident.SEV_HIGH);
-        return incidentRepository.save(request);
+        return incidentRepository.save(request)
+            .doOnSuccess(saved -> {
+                recordHistory(saved.getId(), AlertHistory.ACTION_OPENED,
+                    null, Incident.STATUS_OPEN, null, createdBy);
+                alertNotificationService.notifyOpen(saved);
+            });
     }
 
     /**
@@ -44,28 +53,77 @@ public class IncidentService {
                 template.setStatus(Incident.STATUS_OPEN);
                 template.setOpenedAt(LocalDateTime.now());
                 template.setCreatedBy("AUTO");
-                return incidentRepository.save(template);
+                return incidentRepository.save(template)
+                    .doOnSuccess(saved -> {
+                        recordHistory(saved.getId(), AlertHistory.ACTION_OPENED,
+                            null, Incident.STATUS_OPEN, null, "AUTO");
+                        alertNotificationService.notifyOpen(saved);
+                    });
+            });
+    }
+
+    public Mono<Incident> acknowledge(Long id, String acknowledgedBy, String note) {
+        LocalDateTime now = LocalDateTime.now();
+        return incidentRepository.findById(id)
+            .switchIfEmpty(Mono.error(new RuntimeException("Incident not found: " + id)))
+            .flatMap(existing -> {
+                String oldStatus = existing.getStatus();
+                return incidentRepository.acknowledge(id, now, acknowledgedBy)
+                    .filter(rows -> rows > 0)
+                    .switchIfEmpty(Mono.error(new RuntimeException(
+                        "Incident #" + id + " cannot be acknowledged — it is not OPEN")))
+                    .flatMap(r -> incidentRepository.findById(id))
+                    .doOnSuccess(updated -> {
+                        recordHistory(id, AlertHistory.ACTION_ACKNOWLEDGED,
+                            oldStatus, Incident.STATUS_INVESTIGATING, note, acknowledgedBy);
+                        alertNotificationService.notifyAcknowledge(updated);
+                    });
             });
     }
 
     public Mono<Incident> update(Long id, String status, String severity,
                                   String title, String description, String updatedBy) {
-        return incidentRepository.updateIncident(
-                id, status, severity, title, description, LocalDateTime.now(), updatedBy)
-            .filter(rows -> rows > 0)
+        return incidentRepository.findById(id)
             .switchIfEmpty(Mono.error(new RuntimeException("Incident not found: " + id)))
-            .flatMap(r -> incidentRepository.findById(id));
+            .flatMap(existing -> {
+                String oldStatus = existing.getStatus();
+                return incidentRepository.updateIncident(
+                        id, status, severity, title, description, LocalDateTime.now(), updatedBy)
+                    .filter(rows -> rows > 0)
+                    .switchIfEmpty(Mono.error(new RuntimeException("Incident not found: " + id)))
+                    .flatMap(r -> incidentRepository.findById(id))
+                    .doOnSuccess(updated -> recordHistory(id, AlertHistory.ACTION_UPDATED,
+                        oldStatus, updated.getStatus(), null, updatedBy));
+            });
     }
 
     public Mono<Incident> resolve(Long id, String resolvedBy) {
-        return incidentRepository.updateStatus(id, Incident.STATUS_RESOLVED, LocalDateTime.now(), resolvedBy)
-            .filter(rows -> rows > 0)
+        return incidentRepository.findById(id)
             .switchIfEmpty(Mono.error(new RuntimeException("Incident not found: " + id)))
-            .flatMap(r -> incidentRepository.findById(id));
+            .flatMap(existing -> {
+                String oldStatus = existing.getStatus();
+                return incidentRepository.updateStatus(id, Incident.STATUS_RESOLVED, LocalDateTime.now(), resolvedBy)
+                    .filter(rows -> rows > 0)
+                    .switchIfEmpty(Mono.error(new RuntimeException("Incident not found: " + id)))
+                    .flatMap(r -> incidentRepository.findById(id))
+                    .doOnSuccess(updated -> {
+                        recordHistory(id, AlertHistory.ACTION_RESOLVED,
+                            oldStatus, Incident.STATUS_RESOLVED, null, resolvedBy);
+                        alertNotificationService.notifyResolve(updated);
+                    });
+            });
     }
 
     public Mono<Void> close(Long id, String updatedBy) {
-        return incidentRepository.updateStatus(id, Incident.STATUS_CLOSED, LocalDateTime.now(), updatedBy)
+        return incidentRepository.findById(id)
+            .switchIfEmpty(Mono.error(new RuntimeException("Incident not found: " + id)))
+            .flatMap(existing ->
+                incidentRepository.updateStatus(id, Incident.STATUS_CLOSED, LocalDateTime.now(), updatedBy)
+                    .doOnSuccess(rows -> {
+                        if (rows > 0) recordHistory(id, AlertHistory.ACTION_CLOSED,
+                            existing.getStatus(), Incident.STATUS_CLOSED, null, updatedBy);
+                    })
+            )
             .then();
     }
 
@@ -82,7 +140,20 @@ public class IncidentService {
     }
 
     public Mono<Integer> autoResolve(String triggerKey) {
-        return incidentRepository.autoResolveByTriggerKey(triggerKey, LocalDateTime.now());
+        return incidentRepository.findOpenByTriggerKey(triggerKey)
+            .flatMap(existing ->
+                incidentRepository.autoResolveByTriggerKey(triggerKey, LocalDateTime.now())
+                    .doOnSuccess(rows -> {
+                        if (rows != null && rows > 0)
+                            recordHistory(existing.getId(), AlertHistory.ACTION_RESOLVED,
+                                existing.getStatus(), Incident.STATUS_RESOLVED, "Auto-resolved", "AUTO");
+                    })
+            )
+            .switchIfEmpty(incidentRepository.autoResolveByTriggerKey(triggerKey, LocalDateTime.now()));
+    }
+
+    public Flux<AlertHistory> getHistory(Long incidentId) {
+        return alertHistoryRepository.findAllByIncidentIdOrderByPerformedAtDesc(incidentId);
     }
 
     // ── Dashboard stats ────────────────────────────────────────────────────────
@@ -146,5 +217,23 @@ public class IncidentService {
         if (minutes < 60) return String.format("%.0f min", minutes);
         if (minutes < 1440) return String.format("%.1f hr", minutes / 60);
         return String.format("%.1f days", minutes / 1440);
+    }
+
+    private void recordHistory(Long incidentId, String action, String oldStatus,
+                                String newStatus, String note, String performedBy) {
+        AlertHistory entry = AlertHistory.builder()
+            .incidentId(incidentId)
+            .action(action)
+            .oldStatus(oldStatus)
+            .newStatus(newStatus)
+            .note(note)
+            .performedBy(performedBy)
+            .performedAt(LocalDateTime.now())
+            .build();
+        alertHistoryRepository.save(entry)
+            .subscribe(
+                saved -> {},
+                e -> log.error("Failed to record alert history for incident #{}: {}", incidentId, e.getMessage())
+            );
     }
 }
