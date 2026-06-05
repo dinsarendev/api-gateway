@@ -76,4 +76,15 @@ public class AdminMetricsController {
                 .subscribeOn(Schedulers.boundedElastic())
                 .map(ResponseEntity::ok));
     }
+
+    /**
+     * System metrics: JVM heap, CPU, thread counts, and lifetime gateway counters from Micrometer.
+     */
+    @GetMapping("/system")
+    public Mono<ResponseEntity<Map<String, Object>>> systemMetrics(ServerWebExchange exchange) {
+        return adminAuth.require(exchange, Permissions.MONITORING_READ)
+            .then(Mono.fromCallable(metricsService::getSystemMetrics)
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(ResponseEntity::ok));
+    }
 }

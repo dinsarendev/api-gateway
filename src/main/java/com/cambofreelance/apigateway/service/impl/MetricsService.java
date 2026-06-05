@@ -1,5 +1,8 @@
 package com.cambofreelance.apigateway.service.impl;
 
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,6 +19,7 @@ import java.util.stream.Collectors;
 public class MetricsService {
 
     private final StringRedisTemplate stringRedisTemplate;
+    private final MeterRegistry meterRegistry;
 
     @Value("${monitoring.abuse.threshold-per-minute:100}")
     private int abuseThreshold;
@@ -245,6 +249,68 @@ public class MetricsService {
         return result;
     }
 
+    // ── System / JVM metrics ───────────────────────────────────────────────────
+
+    public Map<String, Object> getSystemMetrics() {
+        double heapUsed  = sumGauges("jvm.memory.used", "area", "heap");
+        double heapMax   = sumGauges("jvm.memory.max",  "area", "heap");
+        double nonHeapUsed = sumGauges("jvm.memory.used", "area", "nonheap");
+
+        double cpuSystem  = readGauge("system.cpu.usage");
+        double cpuProcess = readGauge("process.cpu.usage");
+        double uptime     = readGauge("process.uptime");
+
+        double threadsLive   = readGauge("jvm.threads.live");
+        double threadsDaemon = readGauge("jvm.threads.daemon");
+        double threadsPeak   = readGauge("jvm.threads.peak");
+
+        // Aggregate gateway.request.duration timer across all tags
+        long timerCount = 0;
+        double timerTotalMs = 0.0;
+        for (Timer t : meterRegistry.find("gateway.request.duration").timers()) {
+            timerCount   += t.count();
+            timerTotalMs += t.totalTime(java.util.concurrent.TimeUnit.MILLISECONDS);
+        }
+        long timerAvgMs = timerCount > 0 ? (long) (timerTotalMs / timerCount) : 0;
+
+        // Aggregate gateway.requests.total counter across all tags
+        long totalRequests = 0;
+        for (var c : meterRegistry.find("gateway.requests.total").counters()) {
+            totalRequests += (long) c.count();
+        }
+        long totalErrors = 0;
+        for (var c : meterRegistry.find("gateway.errors.total").counters()) {
+            totalErrors += (long) c.count();
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+
+        Map<String, Object> jvm = new LinkedHashMap<>();
+        jvm.put("heap_used_mb",    heapUsed   >= 0 ? Math.round(heapUsed   / (1024 * 1024)) : -1);
+        jvm.put("heap_max_mb",     heapMax    >= 0 ? Math.round(heapMax    / (1024 * 1024)) : -1);
+        jvm.put("heap_usage_pct",  heapMax    >  0 ? Math.round(heapUsed / heapMax * 1000.0) / 10.0 : -1.0);
+        jvm.put("non_heap_used_mb", nonHeapUsed >= 0 ? Math.round(nonHeapUsed / (1024 * 1024)) : -1);
+        jvm.put("threads_live",    (long) threadsLive);
+        jvm.put("threads_daemon",  (long) threadsDaemon);
+        jvm.put("threads_peak",    (long) threadsPeak);
+        result.put("jvm", jvm);
+
+        Map<String, Object> cpu = new LinkedHashMap<>();
+        cpu.put("system_pct",  cpuSystem  >= 0 ? Math.round(cpuSystem  * 1000.0) / 10.0 : -1.0);
+        cpu.put("process_pct", cpuProcess >= 0 ? Math.round(cpuProcess * 1000.0) / 10.0 : -1.0);
+        result.put("cpu", cpu);
+
+        Map<String, Object> gateway = new LinkedHashMap<>();
+        gateway.put("total_requests_lifetime", totalRequests);
+        gateway.put("total_errors_lifetime",   totalErrors);
+        gateway.put("avg_latency_ms_lifetime", timerAvgMs);
+        result.put("gateway", gateway);
+
+        result.put("uptime_seconds", uptime >= 0 ? (long) uptime : -1);
+        result.put("timestamp",      System.currentTimeMillis());
+        return result;
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────────
 
     private List<String> mget(List<String> keys) {
@@ -282,5 +348,28 @@ public class MetricsService {
             list.add(MetricsCollector.hourBucket(now.minusHours(i)));
         }
         return list;
+    }
+
+    private double readGauge(String name) {
+        try {
+            Gauge g = meterRegistry.find(name).gauge();
+            if (g == null) return -1.0;
+            double v = g.value();
+            return Double.isNaN(v) ? -1.0 : v;
+        } catch (Exception e) {
+            return -1.0;
+        }
+    }
+
+    private double sumGauges(String name, String tagKey, String tagValue) {
+        try {
+            return meterRegistry.find(name).tag(tagKey, tagValue).gauges()
+                .stream()
+                .mapToDouble(Gauge::value)
+                .filter(v -> !Double.isNaN(v) && v >= 0)
+                .sum();
+        } catch (Exception e) {
+            return -1.0;
+        }
     }
 }
