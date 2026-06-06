@@ -123,7 +123,7 @@ public class AdminNotificationChannelController {
                         if (rows <= 0)
                             return Mono.just(ResponseEntity.<NotificationChannel>status(HttpStatus.NOT_FOUND).build());
                         return channelRepository.findById(id)
-                            .map(ch -> ResponseEntity.ok(ch));
+                            .map(ResponseEntity::ok);
                     });
                 })
                 .defaultIfEmpty(ResponseEntity.<NotificationChannel>status(HttpStatus.NOT_FOUND).build()));
