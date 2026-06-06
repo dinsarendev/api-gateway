@@ -57,6 +57,8 @@ pipeline {
                     sh '''
                         echo "Current directory:"
                         pwd
+                        cd frontend
+                        ls -la
                         echo ""
 
                         echo "Checking Dockerfile..."
