@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 const Section = ({ id, children }) => (
@@ -132,17 +132,38 @@ const TOC_ITEMS = [
 // ── main ───────────────────────────────────────────────────────────────────
 export default function GovernanceDocs() {
   const [activeSection, setActiveSection] = useState('overview');
+  const clickedRef = useRef(false);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      entries => {
+        if (clickedRef.current) return;
+        const visible = entries
+          .filter(e => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (visible.length > 0) setActiveSection(visible[0].target.id);
+      },
+      { rootMargin: '-10% 0px -70% 0px', threshold: 0 }
+    );
+    TOC_ITEMS.forEach(({ id }) => {
+      const el = document.getElementById(id);
+      if (el) observer.observe(el);
+    });
+    return () => observer.disconnect();
+  }, []);
 
   const scrollTo = id => {
+    clickedRef.current = true;
     setActiveSection(id);
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setTimeout(() => { clickedRef.current = false; }, 800);
   };
 
   return (
     <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'flex-start' }}>
 
       {/* TOC sidebar */}
-      <div style={{ width: 200, flexShrink: 0, position: 'sticky', top: 0 }}>
+      <div style={{ width: 200, flexShrink: 0, position: 'sticky', top: '1rem', alignSelf: 'flex-start' }}>
         <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)',
           borderRadius: '.75rem', padding: '1rem', fontSize: '.82rem' }}>
           <div style={{ fontWeight: 700, fontSize: '.75rem', textTransform: 'uppercase',

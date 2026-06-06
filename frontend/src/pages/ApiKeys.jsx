@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { API } from '../api/gateway';
 import Modal from '../components/Modal';
+import Pagination from '../components/Pagination';
 import { useToast } from '../context/ToastContext';
 import { useAuth, PERMS } from '../context/AuthContext';
 
-const EMPTY = { name: '', client_id: '', roles: '', permissions: '', expires_at: '' };
+const EMPTY     = { name: '', client_id: '', roles: '', permissions: '', expires_at: '' };
+const PAGE_SIZE = 10;
 
 export default function ApiKeys() {
   const toast    = useToast();
@@ -15,7 +17,9 @@ export default function ApiKeys() {
   const [modal,   setModal]   = useState(false);
   const [form,    setForm]    = useState(EMPTY);
   const [saving,  setSaving]  = useState(false);
-  const [created, setCreated] = useState(null); // raw key shown once after creation
+  const [created, setCreated] = useState(null);
+  const [search,  setSearch]  = useState('');
+  const [page,    setPage]    = useState(0);
 
   const load = async () => {
     setLoading(true);
@@ -25,6 +29,18 @@ export default function ApiKeys() {
   };
 
   useEffect(() => { load(); }, []);
+  useEffect(() => { setPage(0); }, [search]);
+
+  const filtered = useMemo(() =>
+    keys.filter(k =>
+      !search ||
+      k.name?.toLowerCase().includes(search.toLowerCase()) ||
+      k.client_id?.toLowerCase().includes(search.toLowerCase()) ||
+      k.key_prefix?.toLowerCase().includes(search.toLowerCase())
+    ), [keys, search]
+  );
+
+  const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
@@ -75,6 +91,8 @@ export default function ApiKeys() {
       )}
 
       <div className="filter-bar">
+        <input className="form-control" style={{ width: 220 }} placeholder="Search name, client ID…"
+          value={search} onChange={e => setSearch(e.target.value)} />
         {canWrite && (
           <div className="ms-auto">
             <button className="btn btn-primary btn-sm" onClick={() => { setForm(EMPTY); setModal(true); }}>
@@ -92,9 +110,9 @@ export default function ApiKeys() {
                 <tr><th>ID</th><th>Name</th><th>Prefix</th><th>Client ID</th><th>Roles</th><th>Permissions</th><th>Expires</th><th>Last Used</th><th>Actions</th></tr>
               </thead>
               <tbody>
-                {keys.length === 0
-                  ? <tr><td colSpan={9}><div className="empty-state"><i className="fa-solid fa-inbox" />No API keys</div></td></tr>
-                  : keys.map(k => (
+                {paged.length === 0
+                  ? <tr><td colSpan={9}><div className="empty-state"><i className="fa-solid fa-inbox" />{keys.length === 0 ? 'No API keys' : 'No results'}</div></td></tr>
+                  : paged.map(k => (
                     <tr key={k.id}>
                       <td className="text-muted text-sm">#{k.id}</td>
                       <td className="fw-bold">{k.name}</td>
@@ -117,6 +135,7 @@ export default function ApiKeys() {
             </table>
           )}
         </div>
+        <Pagination page={page} total={filtered.length} pageSize={PAGE_SIZE} onChange={setPage} label="keys" />
       </div>
 
       <Modal show={modal} onClose={() => setModal(false)} title="New API Key"

@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { API } from '../api/gateway';
 import Modal from '../components/Modal';
+import Pagination from '../components/Pagination';
 import { useToast } from '../context/ToastContext';
 import { useAuth, PERMS } from '../context/AuthContext';
 
-const EMPTY = { type: 'BLACKLIST', ip_cidr: '', scope: 'GLOBAL', scope_id: '', description: '' };
-
+const EMPTY       = { type: 'BLACKLIST', ip_cidr: '', scope: 'GLOBAL', scope_id: '', description: '' };
 const SCOPE_LABELS = { GLOBAL: 'All Routes', GROUP: 'Service Group', ROUTE: 'Route ID' };
+const PAGE_SIZE   = 15;
 
 export default function IpAccessControl() {
   const toast    = useToast();
@@ -18,7 +19,8 @@ export default function IpAccessControl() {
   const [form,    setForm]    = useState(EMPTY);
   const [saving,  setSaving]  = useState(false);
   const [typeFilter, setTypeFilter] = useState('');
-  const [search, setSearch] = useState('');
+  const [search,  setSearch]  = useState('');
+  const [page,    setPage]    = useState(0);
 
   const load = async () => {
     setLoading(true);
@@ -28,6 +30,7 @@ export default function IpAccessControl() {
   };
 
   useEffect(() => { load(); }, []);
+  useEffect(() => { setPage(0); }, [typeFilter, search]);
 
   const filtered = useMemo(() =>
     rules.filter(r =>
@@ -35,6 +38,8 @@ export default function IpAccessControl() {
       (!search || r.ip_cidr?.includes(search) || r.scope_id?.toLowerCase().includes(search.toLowerCase()))
     ), [rules, typeFilter, search]
   );
+
+  const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
@@ -84,9 +89,9 @@ export default function IpAccessControl() {
                 <tr><th>ID</th><th>Type</th><th>IP / CIDR</th><th>Scope</th><th>Scope Target</th><th>Description</th><th>Actions</th></tr>
               </thead>
               <tbody>
-                {filtered.length === 0
+                {paged.length === 0
                   ? <tr><td colSpan={7}><div className="empty-state"><i className="fa-solid fa-inbox" />No rules found</div></td></tr>
-                  : filtered.map(r => (
+                  : paged.map(r => (
                     <tr key={r.id}>
                       <td className="text-muted text-sm">#{r.id}</td>
                       <td>
@@ -111,6 +116,7 @@ export default function IpAccessControl() {
             </table>
           )}
         </div>
+        <Pagination page={page} total={filtered.length} pageSize={PAGE_SIZE} onChange={setPage} label="rules" />
       </div>
 
       <Modal show={modal} onClose={() => setModal(false)} title="Add IP Rule"

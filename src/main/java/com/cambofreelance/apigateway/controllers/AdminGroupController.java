@@ -129,16 +129,18 @@ public class AdminGroupController {
     @DeleteMapping("/{id}")
     public Mono<ResponseEntity<Map<String, Object>>> delete(@PathVariable Long id, ServerWebExchange exchange) {
         return adminAuth.require(exchange, Permissions.GROUP_WRITE)
-            .then(groupRouteRepository.findById(id)
-                .switchIfEmpty(Mono.error(new RuntimeException("Group not found: " + id)))
+            .then(Mono.defer(() -> groupRouteRepository.findById(id)
+                .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Group not found: " + id)))
                 .flatMap(g -> {
                     g.setStatus("INACT");
                     g.setUpdatedAt(LocalDateTime.now());
                     g.setUpdatedBy(adminAuth.currentUser(exchange));
                     return groupRouteRepository.save(g);
                 })
-                .thenReturn(ResponseEntity.ok(Map.<String, Object>of(
-                    "id", id, "message", "Service group deleted"))));
+                .map(saved -> {
+                    gatewayRouteService.refreshRoutes();
+                    return ResponseEntity.ok(Map.<String, Object>of("id", id, "message", "Service group deleted"));
+                })));
     }
 
     // ── Blue-Green ────────────────────────────────────────────────────────────

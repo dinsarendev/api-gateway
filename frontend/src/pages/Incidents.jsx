@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { API } from '../api/gateway';
 import Modal from '../components/Modal';
+import Pagination from '../components/Pagination';
 import { useToast } from '../context/ToastContext';
 import { useAuth, PERMS } from '../context/AuthContext';
+
+const PAGE_SIZE = 15;
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -97,6 +100,7 @@ export default function Incidents() {
   const [loading,   setLoading]   = useState(true);
   const [filter,    setFilter]    = useState('ALL');
   const [search,    setSearch]    = useState('');
+  const [page,      setPage]      = useState(0);
 
   // Create modal
   const [modal,  setModal]  = useState(false);
@@ -134,6 +138,7 @@ export default function Incidents() {
   }, [filter]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { setPage(0); }, [filter, search]);
 
   const loadHistory = async (id) => {
     setHistoryLoading(true);
@@ -144,14 +149,18 @@ export default function Incidents() {
     finally { setHistoryLoading(false); }
   };
 
-  // ── Filtered list ──────────────────────────────────────────────────────────
+  // ── Filtered + paged list ──────────────────────────────────────────────────
 
-  const filtered = incidents.filter(i =>
-    !search ||
-    i.title?.toLowerCase().includes(search.toLowerCase()) ||
-    i.affectedService?.toLowerCase().includes(search.toLowerCase()) ||
-    i.affectedRoute?.toLowerCase().includes(search.toLowerCase())
+  const filtered = useMemo(() =>
+    incidents.filter(i =>
+      !search ||
+      i.title?.toLowerCase().includes(search.toLowerCase()) ||
+      i.affectedService?.toLowerCase().includes(search.toLowerCase()) ||
+      i.affectedRoute?.toLowerCase().includes(search.toLowerCase())
+    ), [incidents, search]
   );
+
+  const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
@@ -308,14 +317,14 @@ export default function Incidents() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.length === 0
+                  {paged.length === 0
                     ? <tr><td colSpan={canWrite ? 9 : 8}>
                         <div className="empty-state">
                           <i className="fa-solid fa-shield-check" style={{ color: '#22c55e' }} />
                           No incidents found
                         </div>
                       </td></tr>
-                    : filtered.map(i => (
+                    : paged.map(i => (
                       <tr key={i.id} style={{ cursor: 'pointer' }} onClick={() => openDetail(i)}>
                         <td>
                           <i className={`fa-solid ${TYPE_ICON[i.type] || 'fa-circle-dot'}`}
@@ -385,6 +394,7 @@ export default function Incidents() {
             )
           }
         </div>
+        <Pagination page={page} total={filtered.length} pageSize={PAGE_SIZE} onChange={setPage} label="incidents" />
       </div>
 
       {/* ── Create modal ─────────────────────────────────────────────────────── */}

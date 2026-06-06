@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { API } from '../api/gateway';
 import Modal from '../components/Modal';
+import Pagination from '../components/Pagination';
 import { useToast } from '../context/ToastContext';
 import { useAuth, PERMS } from '../context/AuthContext';
 
-const EMPTY = { name: '', introspection_uri: '', client_id: '', client_secret: '' };
+const EMPTY     = { name: '', introspection_uri: '', client_id: '', client_secret: '' };
+const PAGE_SIZE = 10;
 
 export default function OAuth2Providers() {
   const toast    = useToast();
@@ -16,6 +18,8 @@ export default function OAuth2Providers() {
   const [form,      setForm]      = useState(EMPTY);
   const [editId,    setEditId]    = useState(null);
   const [saving,    setSaving]    = useState(false);
+  const [search,    setSearch]    = useState('');
+  const [page,      setPage]      = useState(0);
 
   const load = async () => {
     setLoading(true);
@@ -25,6 +29,17 @@ export default function OAuth2Providers() {
   };
 
   useEffect(() => { load(); }, []);
+  useEffect(() => { setPage(0); }, [search]);
+
+  const filtered = useMemo(() =>
+    providers.filter(p =>
+      !search ||
+      p.name?.toLowerCase().includes(search.toLowerCase()) ||
+      p.client_id?.toLowerCase().includes(search.toLowerCase())
+    ), [providers, search]
+  );
+
+  const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   const openCreate = () => { setEditId(null); setForm(EMPTY); setModal(true); };
   const openEdit   = p  => {
@@ -60,6 +75,8 @@ export default function OAuth2Providers() {
   return (
     <div>
       <div className="filter-bar">
+        <input className="form-control" style={{ width: 220 }} placeholder="Search name or client ID…"
+          value={search} onChange={e => setSearch(e.target.value)} />
         {canWrite && (
           <div className="ms-auto">
             <button className="btn btn-primary btn-sm" onClick={openCreate}>
@@ -77,9 +94,9 @@ export default function OAuth2Providers() {
                 <tr><th>ID</th><th>Name</th><th>Introspection URI</th><th>Client ID</th><th>Status</th><th>Actions</th></tr>
               </thead>
               <tbody>
-                {providers.length === 0
-                  ? <tr><td colSpan={6}><div className="empty-state"><i className="fa-solid fa-inbox" />No providers configured</div></td></tr>
-                  : providers.map(p => (
+                {paged.length === 0
+                  ? <tr><td colSpan={6}><div className="empty-state"><i className="fa-solid fa-inbox" />{providers.length === 0 ? 'No providers configured' : 'No results'}</div></td></tr>
+                  : paged.map(p => (
                     <tr key={p.id}>
                       <td className="text-muted text-sm">#{p.id}</td>
                       <td className="fw-bold">{p.name}</td>
@@ -99,6 +116,7 @@ export default function OAuth2Providers() {
             </table>
           )}
         </div>
+        <Pagination page={page} total={filtered.length} pageSize={PAGE_SIZE} onChange={setPage} label="providers" />
       </div>
 
       <Modal show={modal} onClose={() => setModal(false)} title={editId ? 'Edit OAuth2 Provider' : 'New OAuth2 Provider'}

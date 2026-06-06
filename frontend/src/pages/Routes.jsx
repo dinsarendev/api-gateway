@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { API } from '../api/gateway';
 import Modal from '../components/Modal';
@@ -145,6 +145,45 @@ function Pagination({ page, total, pageSize, onChange }) {
   );
 }
 
+function DetailRow({ r, grp, onEdit, onCopy, canWrite, canApprove, onSubmit, onApprove, onReject, onDeprecate, onUndeprecate, onRetire, onRemove, onToggle, onDoc }) {
+  const fields = [
+    r.description && { label: 'Description', value: r.description },
+    { label: 'Auth Type', value: r.auth_type || 'JWT' },
+    r.required_roles && { label: 'Required Roles', value: r.required_roles },
+    r.required_permissions && { label: 'Required Permissions', value: r.required_permissions },
+    { label: 'Circuit Breaker', value: r.enable_circuit_breaker === 'Y' ? 'Yes' : 'No' },
+    { label: 'Priority', value: r.priority },
+    r.application_id && { label: 'Application ID', value: r.application_id },
+    r.is_encrypt === 'Y' && { label: 'Encrypted', value: 'Yes' },
+    r.documentation && { label: 'Documentation', value: '(see doc viewer)', isDoc: true },
+  ].filter(Boolean);
+
+  return (
+    <tr style={{ background: 'var(--bg-surface-alt, #f8fafc)' }}>
+      <td colSpan={10} style={{ padding: '0 1rem .75rem 2.5rem', borderTop: 'none' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.5rem 2rem', fontSize: '.78rem', color: 'var(--text-secondary, #475569)' }}>
+          {fields.map(({ label, value, isDoc }) => (
+            <span key={label}>
+              <span style={{ fontWeight: 600, color: 'var(--text-muted, #94a3b8)', textTransform: 'uppercase', fontSize: '.67rem', letterSpacing: '.04em' }}>{label}: </span>
+              {isDoc
+                ? <button style={{ background: 'none', border: 'none', padding: 0, color: '#1d4ed8', cursor: 'pointer', fontSize: '.78rem', textDecoration: 'underline' }}
+                    onClick={() => onDoc(r)}>View</button>
+                : <span style={{ color: 'var(--text-primary, #1e293b)' }}>{value}</span>
+              }
+            </span>
+          ))}
+          {grp?.uri && (
+            <span>
+              <span style={{ fontWeight: 600, color: 'var(--text-muted, #94a3b8)', textTransform: 'uppercase', fontSize: '.67rem', letterSpacing: '.04em' }}>Target: </span>
+              <span style={{ fontFamily: 'monospace', color: 'var(--text-primary, #1e293b)' }}>{grp.uri}</span>
+            </span>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 // ── main ───────────────────────────────────────────────────────────────────
 export default function Routes() {
   const toast     = useToast();
@@ -152,6 +191,12 @@ export default function Routes() {
   const canWrite   = can(PERMS.ROUTE_WRITE);
   const canApprove = can(PERMS.ROUTE_APPROVE);
   const [searchParams] = useSearchParams();
+  const [expandedIds, setExpandedIds] = useState(new Set());
+  const toggleExpand = id => setExpandedIds(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
 
   // data
   const [routes, setRoutes] = useState([]);
@@ -414,6 +459,7 @@ export default function Routes() {
               <table>
                 <thead>
                   <tr>
+                    <th style={{ width: 28 }} />
                     <th>ID</th>
                     <th>Path / Version</th>
                     <th>Method</th>
@@ -427,11 +473,23 @@ export default function Routes() {
                 </thead>
                 <tbody>
                   {paged.length === 0
-                    ? <tr><td colSpan={9}><div className="empty-state"><i className="fa-solid fa-inbox" />No routes found</div></td></tr>
+                    ? <tr><td colSpan={10}><div className="empty-state"><i className="fa-solid fa-inbox" />No routes found</div></td></tr>
                     : paged.map(r => {
                       const grp = groupMap[r.group_code];
+                      const expanded = expandedIds.has(r.id);
                       return (
-                        <tr key={r.id}>
+                        <React.Fragment key={r.id}>
+                        <tr>
+                          <td style={{ padding: '0 .25rem', textAlign: 'center' }}>
+                            <button
+                              className="btn-action"
+                              style={{ width: 22, height: 22, padding: 0, border: 'none', background: 'none', color: '#94a3b8', transition: 'transform .15s' }}
+                              title={expanded ? 'Collapse' : 'Expand details'}
+                              onClick={() => toggleExpand(r.id)}
+                            >
+                              <i className={`fa-solid fa-chevron-right`} style={{ fontSize: '.65rem', transform: expanded ? 'rotate(90deg)' : 'none', display: 'inline-block', transition: 'transform .15s' }} />
+                            </button>
+                          </td>
                           <td className="text-muted text-sm">#{r.id}</td>
                           <td>
                             <div className="path-cell" title={r.path}>{r.path}</div>
@@ -556,6 +614,10 @@ export default function Routes() {
                             </div>
                           </td>
                         </tr>
+                        {expanded && (
+                          <DetailRow r={r} grp={grp} canWrite={canWrite} canApprove={canApprove} onDoc={openDoc} />
+                        )}
+                        </React.Fragment>
                       );
                     })}
                 </tbody>
