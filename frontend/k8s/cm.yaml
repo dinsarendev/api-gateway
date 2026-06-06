@@ -3,5 +3,4 @@ kind: ConfigMap
 metadata:
   name: gateway-dashboard-config
   namespace: ms-dev
-data:
-  BACKEND_URL: "https://gateway-api.dev.cambofreelance.com"
+data: {}
