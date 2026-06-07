@@ -73,14 +73,14 @@ public class AdminGroupController {
     public Mono<ResponseEntity<ApiGroupRoute>> create(@RequestBody ApiGroupRoute request, ServerWebExchange exchange) {
         return adminAuth.require(exchange, Permissions.GROUP_WRITE)
             .then(Mono.defer(() -> {
-                try {
-                    if (request.getUri()      != null) SsrfGuard.assertSafeUri(request.getUri());
-                    if (request.getBlueUri()  != null) SsrfGuard.assertSafeUri(request.getBlueUri());
-                    if (request.getGreenUri() != null) SsrfGuard.assertSafeUri(request.getGreenUri());
-                } catch (IllegalArgumentException e) {
-                    return Mono.error(new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST, "Invalid upstream URI: " + e.getMessage()));
-                }
+//                try {
+//                    if (request.getUri()      != null) SsrfGuard.assertSafeUri(request.getUri());
+//                    if (request.getBlueUri()  != null) SsrfGuard.assertSafeUri(request.getBlueUri());
+//                    if (request.getGreenUri() != null) SsrfGuard.assertSafeUri(request.getGreenUri());
+//                } catch (IllegalArgumentException e) {
+//                    return Mono.error(new ResponseStatusException(
+//                        HttpStatus.BAD_REQUEST, "Invalid upstream URI: " + e.getMessage()));
+//                }
                 return groupRouteRepository.existsByCode(request.getCode())
                     .flatMap(exists -> {
                         if (Boolean.TRUE.equals(exists)) {
@@ -104,12 +104,6 @@ public class AdminGroupController {
             @PathVariable Long id, @RequestBody ApiGroupRoute request, ServerWebExchange exchange) {
         return adminAuth.require(exchange, Permissions.GROUP_WRITE)
             .then(Mono.defer(() -> {
-                try {
-                    if (request.getUri() != null) SsrfGuard.assertSafeUri(request.getUri());
-                } catch (IllegalArgumentException e) {
-                    return Mono.error(new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST, "Invalid upstream URI: " + e.getMessage()));
-                }
                 return groupRouteRepository.findById(id)
                     .switchIfEmpty(Mono.error(new RuntimeException("Group not found: " + id)))
                     .flatMap(existing -> {
@@ -162,13 +156,6 @@ public class AdminGroupController {
             @PathVariable String code, @RequestBody BlueGreenConfig req, ServerWebExchange exchange) {
         return adminAuth.require(exchange, Permissions.GROUP_WRITE)
             .then(Mono.defer(() -> {
-                try {
-                    if (req.blueUri()  != null) SsrfGuard.assertSafeUri(req.blueUri());
-                    if (req.greenUri() != null) SsrfGuard.assertSafeUri(req.greenUri());
-                } catch (IllegalArgumentException e) {
-                    return Mono.error(new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST, "Invalid upstream URI: " + e.getMessage()));
-                }
                 return groupRouteRepository.configureSlots(
                         code, req.blueUri(), req.greenUri(),
                         LocalDateTime.now(), adminAuth.currentUser(exchange))

@@ -38,12 +38,12 @@ public class AdminOAuth2ProviderController {
     public Mono<ResponseEntity<OAuth2Provider>> create(@RequestBody OAuth2Provider body, ServerWebExchange exchange) {
         return adminAuth.require(exchange, Permissions.SECURITY_WRITE)
             .then(Mono.defer(() -> {
-                try {
-                    SsrfGuard.assertSafeUri(body.getIntrospectionUri());
-                } catch (IllegalArgumentException e) {
-                    return Mono.error(new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST, "Invalid introspection_uri: " + e.getMessage()));
-                }
+//                try {
+//                    SsrfGuard.assertSafeUri(body.getIntrospectionUri());
+//                } catch (IllegalArgumentException e) {
+//                    return Mono.error(new ResponseStatusException(
+//                        HttpStatus.BAD_REQUEST, "Invalid introspection_uri: " + e.getMessage()));
+//                }
                 body.setId(null);
                 body.setStatus(Constants.STATUS_ACTIVE);
                 body.setCreatedAt(LocalDateTime.now());
@@ -58,14 +58,14 @@ public class AdminOAuth2ProviderController {
             @PathVariable Long id, @RequestBody OAuth2Provider body, ServerWebExchange exchange) {
         return adminAuth.require(exchange, Permissions.SECURITY_WRITE)
             .then(Mono.defer(() -> {
-                if (body.getIntrospectionUri() != null) {
-                    try {
-                        SsrfGuard.assertSafeUri(body.getIntrospectionUri());
-                    } catch (IllegalArgumentException e) {
-                        return Mono.error(new ResponseStatusException(
-                            HttpStatus.BAD_REQUEST, "Invalid introspection_uri: " + e.getMessage()));
-                    }
-                }
+//                if (body.getIntrospectionUri() != null) {
+//                    try {
+//                        SsrfGuard.assertSafeUri(body.getIntrospectionUri());
+//                    } catch (IllegalArgumentException e) {
+//                        return Mono.error(new ResponseStatusException(
+//                            HttpStatus.BAD_REQUEST, "Invalid introspection_uri: " + e.getMessage()));
+//                    }
+//                }
                 return repository.findById(id)
                     .flatMap(existing -> {
                         if (body.getName()             != null) existing.setName(body.getName());
