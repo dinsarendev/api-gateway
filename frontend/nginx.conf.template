@@ -11,7 +11,7 @@ server {
     }
 
     # Proxy all /admin/* API calls to the backend
-    # BACKEND_URL is substituted at container start (e.g. https://gateway-api.prod.cambofreelance.com)
+    # BACKEND_URL is substituted at container start (e.g. {{BACKEND_URL}} -> http://backend:8080)
     location /admin/ {
         rewrite ^/admin/(.*)$ /api/management/admin/$1 break;
         proxy_pass         ${BACKEND_URL};

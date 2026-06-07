@@ -15,10 +15,6 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           rewrite: path => '/api/management' + path,
         },
-        // '/api/management': {
-        //   target: env.API_URL || 'http://localhost:25010',
-        //   changeOrigin: true,
-        // },
       },
     },
     build: {

@@ -22,13 +22,6 @@ configurations {
 
 repositories {
     mavenCentral()
-    maven {
-        url "${findProperty('NEXUS_URL') ?: System.getenv('NEXUS_URL')}/repository/maven-public/"
-        credentials {
-            username = findProperty('NEXUS_USERNAME') ?: System.getenv('NEXUS_USERNAME')
-            password = findProperty('NEXUS_PASSWORD') ?: System.getenv('NEXUS_PASSWORD')
-        }
-    }
 }
 
 ext {
@@ -90,35 +83,3 @@ dependencyManagement {
 tasks.named('test') {
     useJUnitPlatform()
 }
-
-// ── Frontend (React + Vite) ─────────────────────────────────────────────────
-def frontendDir = "$projectDir/frontend"
-def isWindows   = org.gradle.internal.os.OperatingSystem.current().isWindows()
-
-task npmInstall(type: Exec) {
-    description = 'Install frontend dependencies'
-    workingDir  frontendDir
-    inputs.file  "$frontendDir/package.json"
-    outputs.dir  "$frontendDir/node_modules"
-    // Use a login shell on Unix so nvm/Homebrew npm is on PATH in the Gradle daemon
-    if (isWindows) {
-        commandLine 'cmd', '/c', 'npm', 'install', '--prefer-offline'
-    } else {
-        commandLine 'bash', '-lc', 'npm install --prefer-offline'
-    }
-}
-
-task npmBuild(type: Exec, dependsOn: npmInstall) {
-    description = 'Build React frontend into src/main/resources/static'
-    workingDir  frontendDir
-    inputs.dir  "$frontendDir/src"
-    inputs.file "$frontendDir/vite.config.js"
-    outputs.dir "$projectDir/src/main/resources/static"
-    if (isWindows) {
-        commandLine 'cmd', '/c', 'npm', 'run', 'build'
-    } else {
-        commandLine 'bash', '-lc', 'npm run build'
-    }
-}
-
-processResources.dependsOn npmBuild
