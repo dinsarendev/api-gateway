@@ -11,7 +11,7 @@ export default defineConfig(({ mode }) => {
       port: 3000,
       proxy: {
         '/admin': {
-          target: env.API_URL || 'http://localhost:25010',
+          target: env.API_URL || 'http://localhost:26080',
           changeOrigin: true,
           rewrite: path => '/api/management' + path,
         },
