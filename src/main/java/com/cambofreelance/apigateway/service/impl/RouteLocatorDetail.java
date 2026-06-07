@@ -1,10 +1,13 @@
 package com.cambofreelance.apigateway.service.impl;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import com.cambofreelance.apigateway.configs.DecryptRequestBodyFilter;
 import com.cambofreelance.apigateway.configs.EncryptResponseBodyFilter;
 import com.cambofreelance.apigateway.constants.Constants;
+import java.time.Duration;
 import com.cambofreelance.apigateway.models.ApiRoute;
 import com.cambofreelance.apigateway.repositories.ApiRouteRepository;
 import lombok.RequiredArgsConstructor;
@@ -38,7 +41,7 @@ public class RouteLocatorDetail implements RouteLocator {
     public Flux<Route> getRoutes() {
         RouteLocatorBuilder.Builder builder = routeLocatorBuilder.routes();
 
-        return apiRouteRepository.findAllByStatus(Constants.STATUS_ACTIVE)
+        return apiRouteRepository.findAllForGateway()
                 .filter(this::isRouteAvailableNow)
                 .sort(Comparator.comparing(ApiRoute::getPriority, Comparator.nullsLast(Integer::compareTo)))
                 .map(route -> builder.route(route.getId().toString(), spec -> setPredicateSpec(route, spec)))
@@ -54,9 +57,21 @@ public class RouteLocatorDetail implements RouteLocator {
 
     private Buildable<Route> setPredicateSpec(ApiRoute apiRoute, PredicateSpec predicateSpec) {
         BooleanSpec booleanSpec = predicateSpec.path(apiRoute.getPath());
-        if (StringUtils.isNotBlank(apiRoute.getMethod())) {
+        String apiType = apiRoute.getApiType() != null ? apiRoute.getApiType().toUpperCase() : Constants.API_TYPE_REST;
+
+        // GraphQL: allow both GET and POST when no method is explicitly set
+        if (Constants.API_TYPE_GRAPHQL.equals(apiType) && StringUtils.isBlank(apiRoute.getMethod())) {
+            booleanSpec = booleanSpec.and().method("GET", "POST");
+        } else if (StringUtils.isNotBlank(apiRoute.getMethod())) {
             booleanSpec = booleanSpec.and().method(apiRoute.getMethod());
         }
+
+        // Streaming/AI: set 30-min response timeout via route metadata
+        // (GatewayFilterSpec has no setResponseTimeout; metadata is the correct API)
+        if (Constants.API_TYPE_STREAMING.equals(apiType) || Constants.API_TYPE_AI.equals(apiType)) {
+            booleanSpec = (BooleanSpec) booleanSpec.metadata("response-timeout", Duration.ofMinutes(30));
+        }
+
         return booleanSpec
                 .filters(f -> {
                     if (Constants.YES.equalsIgnoreCase(apiRoute.getIsEncrypt())) {
@@ -69,8 +84,39 @@ public class RouteLocatorDetail implements RouteLocator {
                             c.setFallbackUri("forward:/fallback/" + apiRoute.getGroupCode());
                         });
                     }
+                    if (StringUtils.isNotBlank(apiRoute.getVersion())) {
+                        f.addResponseHeader("X-API-Version", apiRoute.getVersion());
+                    }
+                    if (Constants.YES.equalsIgnoreCase(apiRoute.getDeprecated())) {
+                        f.addResponseHeader("Deprecation", "true");
+                        if (apiRoute.getSunsetDate() != null) {
+                            String sunset = apiRoute.getSunsetDate()
+                                .atOffset(ZoneOffset.UTC)
+                                .format(DateTimeFormatter.RFC_1123_DATE_TIME);
+                            f.addResponseHeader("Sunset", sunset);
+                        }
+                    }
+                    applyApiTypeFilters(f, apiType);
                     return f;
                 })
                 .uri(apiRoute.getUri());
+    }
+
+    private void applyApiTypeFilters(
+            org.springframework.cloud.gateway.route.builder.GatewayFilterSpec f,
+            String apiType) {
+        switch (apiType) {
+            case Constants.API_TYPE_SOAP ->
+                // SOAP services expect XML content type
+                f.addRequestHeader("Content-Type", "text/xml;charset=UTF-8");
+            case Constants.API_TYPE_STREAMING, Constants.API_TYPE_AI -> {
+                // SSE/streaming: disable buffering and remove chunked-encoding header
+                // so browsers receive events as they arrive
+                f.removeResponseHeader("Transfer-Encoding");
+                f.addResponseHeader("X-Accel-Buffering", "no");
+                f.addResponseHeader("Cache-Control", "no-cache");
+            }
+            default -> { /* REST / GRAPHQL: no additional filters */ }
+        }
     }
 }

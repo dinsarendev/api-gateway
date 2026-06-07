@@ -1,6 +1,5 @@
 package com.cambofreelance.apigateway.service.impl;
 
-import com.cambofreelance.apigateway.caches.ApiRouteManagerRedisCache;
 import com.cambofreelance.apigateway.constants.Constants;
 import com.cambofreelance.apigateway.dto.ApiRouteDto;
 import lombok.extern.slf4j.Slf4j;
@@ -17,127 +16,69 @@ public class RateLimiterService {
 
     private static final String LUA_SCRIPT =
         "local key = KEYS[1] " +
-            "local limit = tonumber(ARGV[1]) " +
-            "local window = tonumber(ARGV[2]) " +
-            "local current = redis.call('INCR', key) " +
-            "if current == 1 then " +
-            "    redis.call('EXPIRE', key, window) " +
-            "end " +
-            "if current > limit then " +
-            "    return 0 " +
-            "else " +
-            "    return 1 " +
-            "end";
+        "local limit = tonumber(ARGV[1]) " +
+        "local window = tonumber(ARGV[2]) " +
+        "local current = redis.call('INCR', key) " +
+        "if current == 1 then " +
+        "    redis.call('EXPIRE', key, window) " +
+        "end " +
+        "if current > limit then " +
+        "    return 0 " +
+        "else " +
+        "    return 1 " +
+        "end";
 
-    // Reuse Redis script instead of recreating each call
-    private static final RedisScript<Long> REDIS_SCRIPT =
-        RedisScript.of(LUA_SCRIPT, Long.class);
+    private static final RedisScript<Long> REDIS_SCRIPT = RedisScript.of(LUA_SCRIPT, Long.class);
 
     private final StringRedisTemplate stringRedisTemplate;
-    private final ApiRouteManagerRedisCache apiRouteManagerRedisCache;
 
-    public RateLimiterService(StringRedisTemplate stringRedisTemplate,
-        ApiRouteManagerRedisCache apiRouteManagerRedisCache) {
+    public RateLimiterService(StringRedisTemplate stringRedisTemplate) {
         this.stringRedisTemplate = stringRedisTemplate;
-        this.apiRouteManagerRedisCache = apiRouteManagerRedisCache;
     }
 
     /**
-     * g Check if request is allowed based on: - Public API -> use clientIp - Private API -> use
-     * userId + deviceId
+     * Checks whether the request is within the rate limit for its route.
+     *
+     * Uses the route's own path pattern as the Redis key bucket so that all
+     * requests matching the same route (e.g. /users/123 and /users/456 both
+     * matching /users/{id}) share one counter per client IP.
+     *
+     * Fail-open: if Redis is unavailable, the request is allowed through.
      */
-//    public Mono<Boolean> isAllowed(String path,
-//                                   String method,
-//                                   String userId,
-//                                   String deviceId,
-//                                   String clientIp) {
-//
-//        final String normalizedPath = normalizePath(path);
-//        ApiRouteDto routeConfig = apiRouteManagerRedisCache.getPathAndMethod(normalizedPath, method);
-//
-//        if (routeConfig == null || routeConfig.getRateLimit() == null) {
-//            return Mono.just(true); // no rate limit configured
-//        }
-//
-//        String safeUserId;
-//        String safeDeviceId;
-//
-//        if (Constants.YES.equals(routeConfig.getIsPublic())) {
-//            // Public API -> fallback to IP + deviceId
-//            safeUserId = "public";
-//            // Use Device-Id header if present; fallback to IP
-//            safeDeviceId = (deviceId != null && !deviceId.isEmpty())
-//                ? deviceId
-//                : (clientIp != null && !clientIp.isEmpty() ? clientIp : "unknown-device");
-//        } else {
-//            // Private API -> use userId + deviceId
-//            safeUserId = (userId != null && !userId.isEmpty()) ? userId : "anonymous";
-//            safeDeviceId = (deviceId != null && !deviceId.isEmpty()) ? deviceId : "unknown";
-//        }
-//
-//        // Redis key format: rate_limit:user/device OR rate_limit:public:ip
-//        String redisKey = String.format("rate_limit:%s:%s:%s:%s",
-//                safeUserId, safeDeviceId, normalizedPath, method);
-//
-//        log.info("Rate limiting -> path={}, method={}, userId={}, deviceId={}, redisKey={}",
-//                path, method, safeUserId, safeDeviceId, redisKey);
-//
-//        return Mono.fromCallable(() -> stringRedisTemplate.execute(
-//                        REDIS_SCRIPT,
-//                        Collections.singletonList(redisKey),
-//                        routeConfig.getRateLimit().toString(),
-//                        routeConfig.getRateLimitDuration().toString()
-//                ))
-//                .map(result -> result != null && result == 1)
-//                .onErrorResume(ex -> {
-//                    log.error("Rate limiter Redis error: {}", ex.getMessage(), ex);
-//                    return Mono.just(true); // fail-open, can change to false if stricter
-//                });
-//    }
-    public Mono<Boolean> isAllowed(String path, String method, String clientIp) {
-
-        final String normalizedPath = normalizePath(path);
-        ApiRouteDto routeConfig = apiRouteManagerRedisCache.getPathAndMethod(normalizedPath,
-            method);
-
-        // No rate limit configured → allow request
+    public Mono<Boolean> isAllowed(String method, String clientIp, ApiRouteDto routeConfig) {
         if (routeConfig == null || routeConfig.getRateLimit() == null) {
             return Mono.just(true);
         }
 
-        // ✅ Always apply rate limit per IP + route
-        String safeClientIp = (clientIp != null && !clientIp.isEmpty()) ? clientIp : "unknown-ip";
+        String safeIp = (clientIp != null && !clientIp.isEmpty()) ? clientIp : "unknown-ip";
+        String scope  = Constants.YES.equalsIgnoreCase(routeConfig.getIsPublic()) ? "public" : "private";
+        String route  = routePatternKey(routeConfig.getPath());
 
-        // Optional: separate public/private route namespaces
-        String rateScope = Constants.YES.equals(routeConfig.getIsPublic()) ? "public" : "private";
+        // key: rate_limit:<scope>:<ip>:<route-pattern>:<METHOD>
+        String redisKey = String.format("rate_limit:%s:%s:%s:%s", scope, safeIp, route, method.toUpperCase());
 
-        // ✅ Redis key: rate_limit:<scope>:<ip>:<path>:<method>
-        String redisKey = String.format("rate_limit:%s:%s:%s:%s",
-            rateScope, safeClientIp, normalizedPath, method);
+        log.debug("Rate limit check: key={}, limit={}, window={}s",
+            redisKey, routeConfig.getRateLimit(), routeConfig.getRateLimitDuration());
 
-        log.info("Rate limiting -> path={}, method={}, clientIp={}, redisKey={}",
-            path, method, safeClientIp, redisKey);
-
-        // Execute rate limit Lua script
         return Mono.fromCallable(() -> stringRedisTemplate.execute(
                 REDIS_SCRIPT,
                 Collections.singletonList(redisKey),
                 routeConfig.getRateLimit().toString(),
-                routeConfig.getRateLimitDuration().toString()
-            ))
-            .map(result -> result != null && result == 1)
+                routeConfig.getRateLimitDuration().toString()))
+            .map(result -> result != null && result == 1L)
             .onErrorResume(ex -> {
-                log.error("Rate limiter Redis error: {}", ex.getMessage(), ex);
-                return Mono.just(true); // fail-open mode (can be false for strict mode)
+                log.error("Rate limiter Redis error (fail-open): {}", ex.getMessage());
+                return Mono.just(true);
             });
     }
 
-
-    public String normalizePath(String path) {
-        path = path.replaceAll("/\\d+", "/{id}"); // numeric IDs
-        path = path.replaceAll("/[0-9a-fA-F\\-]{36}", "/{id}"); // UUIDs
-        path = path.replaceAll("/[a-zA-Z0-9]{8,}", "/{id}"); // generic long IDs
-        return path;
+    /**
+     * Strips the /** suffix from wildcard route patterns so that routes
+     * resolved from in-memory cache (/api) and Redis cache (/api/**) produce
+     * the same rate limit key.
+     */
+    private String routePatternKey(String path) {
+        if (path == null) return "/";
+        return path.endsWith("/**") ? path.substring(0, path.length() - 3) : path;
     }
-
 }

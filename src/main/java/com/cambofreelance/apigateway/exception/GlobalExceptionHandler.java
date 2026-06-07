@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.bind.support.WebExchangeBindException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
@@ -19,6 +20,20 @@ import reactor.util.annotation.NonNull;
 public class GlobalExceptionHandler {
 
     private final Tracer tracer;
+
+    @ExceptionHandler(RouteCreationException.class)
+    public Mono<MessageResponse> handleRouteCreation(RouteCreationException ex, ServerWebExchange exchange) {
+        return buildMessageResponse("400", ex.getMessage(), HttpStatus.BAD_REQUEST, exchange);
+    }
+
+    @ExceptionHandler(WebExchangeBindException.class)
+    public Mono<MessageResponse> handleValidation(WebExchangeBindException ex, ServerWebExchange exchange) {
+        String detail = ex.getBindingResult().getFieldErrors().stream()
+            .map(f -> f.getField() + ": " + f.getDefaultMessage())
+            .findFirst()
+            .orElse(ex.getMessage());
+        return buildMessageResponse("400", detail, HttpStatus.BAD_REQUEST, exchange);
+    }
 
     @ExceptionHandler(PathNotFoundException.class)
     public Mono<MessageResponse> handlePathNotFound(PathNotFoundException ex, ServerWebExchange exchange) {

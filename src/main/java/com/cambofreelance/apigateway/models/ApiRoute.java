@@ -4,11 +4,11 @@ import java.io.Serial;
 import java.io.Serializable;
 import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.experimental.SuperBuilder;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
@@ -17,7 +17,7 @@ import org.springframework.data.relational.core.mapping.Table;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
+@SuperBuilder(toBuilder = true)
 @EqualsAndHashCode(callSuper = false)
 @Table("api_route")
 public class ApiRoute extends BaseEntity implements Serializable {
@@ -72,4 +72,37 @@ public class ApiRoute extends BaseEntity implements Serializable {
 
     @Column("enable_circuit_breaker")
     private String enableCircuitBreaker;
+
+    @Column("auth_type")
+    private String authType;
+
+    @Column("required_roles")
+    private String requiredRoles;
+
+    @Column("required_permissions")
+    private String requiredPermissions;
+
+    @Column("api_type")
+    private String apiType;
+
+    @Column("version")
+    private String version;
+
+    @Column("deprecated")
+    private String deprecated;
+
+    @Column("sunset_date")
+    private LocalDateTime sunsetDate;
+
+    @Column("tags")
+    private String tags;
+
+    @Column("sla_tier")
+    private String slaTier;
+
+    @Column("documentation")
+    private String documentation;
+
+    @Column("rejection_reason")
+    private String rejectionReason;
 }

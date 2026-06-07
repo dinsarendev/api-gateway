@@ -20,31 +20,43 @@ public class ApiRouteDto implements Serializable {
     private String uri;
     private String path;
     private String method;
+    private String groupCode;
     private String description;
     private String applicationId;
     private Integer rateLimit;
     private Integer rateLimitDuration;
     private String isPublic;
+    private String isEncrypt;
+    private String enableCircuitBreaker;
     private String status;
     private Integer priority;
     private LocalDateTime startTime;
     private LocalDateTime endTime;
-
+    private String authType;
+    private String requiredRoles;
+    private String requiredPermissions;
+    private String apiType;
 
     public void setData(ApiRoute data) {
         this.id = data.getId();
         this.uri = data.getUri();
         this.path = data.getPath();
         this.method = data.getMethod();
+        this.groupCode = data.getGroupCode();
         this.description = data.getDescription();
         this.applicationId = data.getApplicationId();
         this.rateLimit = data.getRateLimit();
         this.rateLimitDuration = data.getRateLimitDuration();
         this.isPublic = data.getIsPublic();
+        this.isEncrypt = data.getIsEncrypt();
+        this.enableCircuitBreaker = data.getEnableCircuitBreaker();
         this.status = data.getStatus();
         this.priority = data.getPriority();
         this.startTime = data.getStartTime();
         this.endTime = data.getEndTime();
+        this.authType = data.getAuthType();
+        this.requiredRoles = data.getRequiredRoles();
+        this.requiredPermissions = data.getRequiredPermissions();
+        this.apiType = data.getApiType();
     }
-
 }

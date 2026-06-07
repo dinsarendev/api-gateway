@@ -8,7 +8,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
 import org.springframework.cloud.gateway.filter.factory.rewrite.ModifyRequestBodyGatewayFilterFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
+import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 
 @Component
@@ -24,14 +26,17 @@ public class DecryptRequestBodyFilter extends AbstractGatewayFilterFactory<Decry
 
         modifyRequestBodyConfig.setRewriteFunction(String.class, String.class, (exchange, bodyAsString) -> {
             try {
-                if(StringUtils.isEmpty(bodyAsString)) return Mono.empty();
+                if (StringUtils.isEmpty(bodyAsString)) return Mono.empty();
 
                 BaseRequest baseRequest = objectMapper.readValue(bodyAsString, BaseRequest.class);
                 String decryptedResponse = aesCipherEncryption.decrypt(baseRequest.getPayload(), baseRequest.getIv());
                 return Mono.just(decryptedResponse);
             } catch (Exception e) {
-                log.error("Failed to decrypt request body {}", e.getMessage());
-                return Mono.just(bodyAsString);
+                // Fail closed — GCM authentication tag failure indicates tampering.
+                // Forwarding the original body would bypass the encryption contract.
+                log.warn("Request body decryption failed — rejecting request: {}", e.getMessage());
+                return Mono.error(new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Request decryption failed"));
             }
         });
 

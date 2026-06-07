@@ -1,4 +1,4 @@
-# Spring Cloud Gateway Project
+# Spring Cloud Gateway Project: Update
 # Getting Started
 A Spring Boot 3.4.5  Spring Cloud Gateway application for routing and securing microservices.
 It supports dynamic route configuration in database and store and store redis cache for validate route, JWT authentication, and integration with service .
@@ -296,5 +296,7 @@ INSERT INTO api_route (group_code, application_id, description, is_public, "meth
   runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.11.5' // or jjwt-gson if you prefer
   implementation("org.mindrot:jbcrypt:0.4")
 ```
+
+### DEVOPS
 ### 📜 License MIT License
 Cambofreelance.com is licensed

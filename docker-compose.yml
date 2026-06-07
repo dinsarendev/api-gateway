@@ -1,12 +1,21 @@
-version: '3'
+version: '3.8'
+name: cf-team
+
 services:
   api-gateway:
+    image: nexus.cambofreelance.com/docker-hosted/api-gateway:v1.0.0
     container_name: api-gateway
-    image: cambo-registry.cambofreelance.com/keycloak/api-gateway:1
+    build:
+        context: .
+        dockerfile: Dockerfile
+    restart: unless-stopped
     ports:
       - "25010:25010"
+    environment:
+        - SPRING_PROFILES_ACTIVE=dev
     networks:
       - cf-network
+
 networks:
   cf-network:
     external: true

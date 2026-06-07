@@ -1,0 +1,53 @@
+import { createContext, useContext, useMemo } from 'react';
+import { auth } from '../auth';
+
+const AuthContext = createContext(null);
+
+// Permission → menu/action mapping
+export const PERMS = {
+  ROUTE_READ:    'ROUTE_READ',
+  ROUTE_WRITE:   'ROUTE_WRITE',
+  ROUTE_APPROVE: 'ROUTE_APPROVE',
+  GROUP_READ:    'GROUP_READ',
+  GROUP_WRITE:   'GROUP_WRITE',
+  REGISTRY_READ: 'REGISTRY_READ',
+  REGISTRY_WRITE:'REGISTRY_WRITE',
+  HEALTH_READ:   'HEALTH_READ',
+  SECURITY_READ: 'SECURITY_READ',
+  SECURITY_WRITE:'SECURITY_WRITE',
+  USER_READ:     'USER_READ',
+  USER_WRITE:    'USER_WRITE',
+  ROLE_READ:     'ROLE_READ',
+  ROLE_WRITE:    'ROLE_WRITE',
+  MONITORING_READ:    'MONITORING_READ',
+  INCIDENT_READ:      'INCIDENT_READ',
+  INCIDENT_WRITE:     'INCIDENT_WRITE',
+  NOTIFICATION_READ:  'NOTIFICATION_READ',
+  NOTIFICATION_WRITE: 'NOTIFICATION_WRITE',
+  AUDIT_LOG_READ:     'AUDIT_LOG_READ',
+};
+
+export function AuthProvider({ children }) {
+  const value = useMemo(() => {
+    const roles       = auth.getRoles();
+    const permissions = auth.getPermissions();
+    const permSet     = new Set(permissions);
+    const roleSet     = new Set(roles);
+
+    const isSuperAdmin = roleSet.has('SUPER_ADMIN');
+
+    return {
+      roles,
+      permissions,
+      can:          (perm)  => isSuperAdmin || permSet.has(perm),
+      hasRole:      (role)  => roleSet.has(role),
+      isSuperAdmin: ()      => isSuperAdmin,
+    };
+  }, []);
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth() {
+  return useContext(AuthContext);
+}
