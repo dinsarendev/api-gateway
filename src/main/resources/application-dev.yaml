@@ -1,0 +1,137 @@
+server:
+  port: 26080
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    compatibility-verifier:
+      enabled: false
+    gateway:
+      globalcors:
+        add-to-simple-url-handler-mapping: true
+        cors-configurations:
+          '[/**]':
+            allowedOriginPatterns:
+              - "http://localhost:[*]"
+              - "https://*.cambofreelance.com"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+            allowedHeaders:
+              - "*"
+            allowCredentials: true
+  r2dbc:
+    url: r2dbc:postgresql://localhost:5432/dev_api_gateway_db
+    username: postgres
+    password: 1234
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: URL-OAUTH2-ISSUER
+
+logging:
+  enable: true
+  includeRequest: true
+  includeRequestBody: true
+  maskLogKey: maskingKey001,maskingkey001,masking-key-002 # its key is sensitive
+  ignoreDefaultMaskingLogKey: ignoreMaskingKey001,ignoreMasking-key-002
+  includeRequestHeader: true
+  maxRequestBody: 1000 # its value is byte
+  ignoreAntMatches: /abc,/zte-ba/**,/hiding-log # this value just example
+  includeResponse: true
+  includeResponseHeader: true
+  maskResponseHeaderKey: maskingKey001,maskingkey001,masking-key-002 # its key isn't sensitive
+  includeResponseBody: true
+  maxResponseBody: 200 # its value is byte, the log size response
+  pattern:
+    level: "%5p [${spring.application.name},%X{traceId},%X{spanId}]"
+    console: "[%d] [%t] %-5level [${spring.application.name},%X{traceId},%X{spanId},%X{activityid}] %logger{36} - %msg%n"
+
+otel:
+  exporter:
+    otlp:
+      endpoint: http://alloy:4317
+      protocol: grpc
+  logs:
+    exporter: none
+  metrics:
+    exporter: none
+  traces:
+    sampler:
+      probability: 1.0
+
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+    from: ${MAIL_FROM:noreply@cambofreelance.com}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics,refresh
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        gateway.request.duration: true
+      percentiles:
+        gateway.request.duration: 0.5,0.95,0.99
+
+monitoring:
+  abuse:
+    threshold-per-minute: 100
+
+incident:
+  detection:
+    enabled: true
+    window-minutes: 5
+    interval-ms: 60000
+    initial-delay-ms: 60000
+    error-rate-threshold: 0.10
+    auth-failure-threshold: 0.15
+    timeout-rate-threshold: 0.05
+    p95-latency-threshold-ms: 2000
+    api-down-error-rate: 0.95
+    api-down-min-requests: 10
+    cpu-threshold: 0.80
+    memory-threshold: 0.85
+
+health-check:
+  interval-ms: 30000
+  initial-delay-ms: 15000
+authentication:
+  jwtExpiration: 3600000 # 1 hour
+  jwtRefreshExpiration: 2592000000 # 30 days in ms
+  jwtSecret: 72895df7-b9c9-449f-a71a-6dfdf3c9a1cf
+
+storage:
+  redis:
+    key-response-code: key-response-code
+    key-api-route: key-api-route
+
+aes-cipher:
+  gcm:
+    key: +tGHwQqilsKd+PszQpcnPuOo2YxMnQuCF/YgDjk4DdQ=
+    algorithm: AES/GCM/NoPadding
+    iv: PLx4PVdUNV7eJSIS0CgtWQ==
+    tag-size: 128
